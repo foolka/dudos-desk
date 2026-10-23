@@ -1,0 +1,13 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { spawnSync } = require('node:child_process');
+const root = path.resolve(__dirname, '..'), version = require('../package.json').version;
+const compiler = process.env.ISCC_EXE;
+if (!compiler) throw Error('Set ISCC_EXE to Inno Setup 6 ISCC.exe');
+const result = spawnSync(compiler, ['/Qp', '/DAppVersion=' + version, '/DPackageDir=' + path.join(root, 'release/DudosDesk-win32-x64'), '/DOutputDir=' + path.join(root, 'release'), path.join(root, 'tools/installer.iss')], { stdio: 'inherit', windowsHide: true });
+if (result.error) throw result.error;
+if (result.status !== 0) process.exit(result.status || 1);
+const file = path.join(root, `release/dudos-desk-${version}-windows-x64-setup.exe`);
+fs.writeFileSync(file + '.sha256', crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') + '  ' + path.basename(file) + '\n');
+console.log(file);

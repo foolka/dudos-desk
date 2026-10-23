@@ -1,0 +1,25 @@
+.b-notice {
+    display: flex;
+    gap: 12px;
+    padding: 13px 24px;
+    background: var(--notice);
+    color: var(--notice-text);
+    border-bottom: 1px solid var(--notice-line);
+    font-size: 13px;
+    flex: none;
+
+    > svg {
+        margin-top: 2px;
+        width: 20px;
+        height: 20px;
+    }
+    strong {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 14px;
+    }
+    .b-check {
+        margin-top: 9px;
+        font-weight: 600;
+    }
+}

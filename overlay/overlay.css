@@ -1,0 +1,201 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: "Segoe UI", Arial, sans-serif;
+  letter-spacing: 0;
+}
+
+#stage {
+  position: absolute;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: top left;
+  overflow: hidden;
+}
+
+.is-preview {
+  background: repeating-conic-gradient(#d9e2e3 0% 25%, #edf2f3 0% 50%) 50%/24px 24px;
+}
+
+.bsod {
+  position: absolute;
+  inset: 0;
+  padding: 100px 150px;
+  color: white;
+  background: #0078d7;
+}
+
+.bsod__face {
+  font-size: 160px;
+  line-height: 1;
+}
+
+.bsod__title {
+  font-size: 48px;
+  line-height: 1.4;
+  max-width: 1400px;
+  margin-top: 42px;
+}
+
+.bsod__detail {
+  font-size: 26px;
+  line-height: 1.5;
+  margin-top: 50px;
+}
+
+.captcha {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  transform: translate(-50%, -50%);
+  width: 820px;
+  padding: 38px;
+  background: #f8fafb;
+  border: 3px solid #293b40;
+  border-radius: 8px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.4);
+  color: #17292c;
+  text-align: center;
+}
+
+.captcha__title {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.captcha__hint {
+  font-size: 23px;
+  color: #56636c;
+  margin-bottom: 24px;
+}
+
+.captcha__code {
+  background: #17292c;
+  color: white;
+  padding: 14px 24px;
+  font: 700 48px Consolas, monospace;
+  display: inline-block;
+}
+
+.captcha input {
+  display: block;
+  width: 400px;
+  margin: 24px auto 0;
+  padding: 12px;
+  font: 32px Consolas, monospace;
+  text-align: center;
+  border: 2px solid #8b9c9d;
+  border-radius: 4px;
+  background: white;
+  color: #17292c;
+}
+
+.captcha input:focus {
+  outline: 3px solid #168978;
+  outline-offset: 2px;
+}
+
+.captcha__error {
+  color: #be3434;
+  height: 28px;
+  font-size: 20px;
+  margin-top: 10px;
+}
+
+.arrows {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.arrow {
+  width: 92px;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: #17292c;
+  font-size: 54px;
+  border-radius: 5px;
+}
+
+.arrow--done {
+  background: #147c68;
+}
+
+.countdown {
+  font-size: 18px;
+  color: #607477;
+  margin-top: 10px;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+}
+
+.error {
+  position: absolute;
+  width: 620px;
+  height: 220px;
+  color: #171c22;
+  background: #f3f5f7;
+  border: 2px solid #88989b;
+  box-shadow: 8px 12px 24px rgba(0, 0, 0, 0.3333333333);
+  animation: appear 0.15s ease-out;
+}
+
+.error__bar {
+  font-size: 24px;
+  background: #dfe7eb;
+  padding: 12px 18px;
+}
+
+.error__body {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 24px;
+  font-size: 25px;
+  line-height: 1.3;
+}
+
+.error__icon {
+  flex: none;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: #d33c4a;
+  color: white;
+  font-size: 40px;
+  text-align: center;
+}
+
+.error__ok {
+  position: absolute;
+  right: 22px;
+  bottom: 12px;
+  font-size: 20px;
+  padding: 4px 40px;
+  border: 1px solid #88989b;
+  background: #e6ebee;
+}
+
+@keyframes appear {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

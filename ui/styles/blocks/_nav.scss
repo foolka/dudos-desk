@@ -1,0 +1,32 @@
+.b-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    flex: none;
+
+    &__tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    &__controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+    }
+    button[aria-current="page"] {
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-color: transparent;
+    }
+    button[aria-current="false"] {
+        border-color: transparent;
+        background: transparent;
+    }
+}

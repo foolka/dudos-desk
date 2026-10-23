@@ -1,0 +1,12 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { spawnSync } = require('node:child_process');
+const root = path.resolve(__dirname, '..'), version = require('../package.json').version;
+const source = path.join(root, 'release/DudosDesk-win32-x64');
+const target = path.join(root, `release/dudos-desk-${version}-windows-x64-portable.zip`);
+const command = 'Compress-Archive -LiteralPath $env:DUDOS_PACKAGE -DestinationPath $env:DUDOS_ARCHIVE -Force';
+const result = spawnSync('powershell.exe', ['-NoProfile', '-Command', command], { env: { ...process.env, DUDOS_PACKAGE: source, DUDOS_ARCHIVE: target }, stdio: 'inherit', windowsHide: true });
+if (result.status !== 0) process.exit(result.status || 1);
+fs.writeFileSync(target + '.sha256', crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex') + '  ' + path.basename(target) + '\n');
+console.log(target);

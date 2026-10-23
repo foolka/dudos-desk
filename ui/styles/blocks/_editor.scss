@@ -1,0 +1,42 @@
+.b-editor {
+    display: grid;
+    grid-template-columns: minmax(280px, .95fr) minmax(300px, 1.3fr);
+    gap: 30px;
+    align-items: start;
+
+    @media screen and (max-width: 1050px) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    &__heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 28px;
+    }
+    &__settings {
+        min-width: 0;
+    }
+    &__chance {
+        display: flex;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+        padding: 0 0 16px;
+        color: var(--muted);
+        font-size: 13px;
+
+        strong {
+            color: var(--accent);
+            font-size: 16px;
+        }
+    }
+    &__actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+    }
+}

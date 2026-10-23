@@ -1,0 +1,8 @@
+node_modules/
+release/
+test-output/
+*.log
+*.sqlite*
+*.bin
+.env*
+profile/

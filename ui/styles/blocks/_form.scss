@@ -1,0 +1,43 @@
+.b-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+
+    &__row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+
+        @media screen and (max-width: 500px) {
+            grid-template-columns: minmax(0, 1fr);
+        }
+    }
+}
+.b-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 7px;
+
+    > span {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 13px;
+        color: var(--muted);
+    }
+    output {
+        margin-left: auto;
+        color: var(--accent);
+        font-weight: 600;
+    }
+    .b-inline input {
+        flex: 1;
+    }
+}
+.b-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}

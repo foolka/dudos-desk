@@ -1,0 +1,37 @@
+.b-help {
+    display: inline-flex;
+    position: relative;
+    flex: none;
+    align-items: center;
+    cursor: help;
+    color: var(--muted);
+
+    > svg {
+        width: 14px;
+        height: 14px;
+    }
+    > span {
+        display: none;
+        position: absolute;
+        z-index: 20;
+        width: 260px;
+        left: 0;
+        top: calc(100% + 8px);
+        padding: 12px;
+        background: var(--text);
+        color: var(--surface);
+        border-radius: 5px;
+        font-size: 12px;
+        line-height: 1.5;
+        font-weight: 400;
+        box-shadow: 0 4px 16px #0003;
+        pointer-events: none;
+    }
+    &:hover > span, &:focus > span {
+        display: block;
+    }
+}
+.b-nav__controls .b-help > span, .b-connection__meta .b-help > span, .b-preview__test .b-help > span {
+    left: auto;
+    right: 0;
+}
