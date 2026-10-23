@@ -1,7 +1,7 @@
 {
   "name": "dudos-desk",
   "productName": "Dudos Desk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Local playful desktop effects and OBS mirror for streamers",
   "author": "FermionaPlay",
@@ -19,7 +19,7 @@
     "installer": "node tools/build-installer.cjs",
     "portable": "node tools/package-portable.cjs"
   },
-  "dependencies": { "lucide": "0.468.0" },
+  "dependencies": { "lucide": "0.468.0", "@twurple/api": "8.2.0", "@twurple/auth": "8.2.0", "@twurple/eventsub-ws": "8.2.0" },
   "devDependencies": {
     "electron": "42.11.18",
     "@electron/packager": "20.3.0",

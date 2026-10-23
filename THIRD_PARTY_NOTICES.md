@@ -4,6 +4,7 @@ Dudos Desk is distributed under GPL-2.0-or-later. The effect concepts are adapte
 
 - Electron: MIT, https://github.com/electron/electron . Its full license is included as LICENSE.electron.txt; Chromium/Node.js notices are included in the packaged distribution.
 - Lucide icons: ISC, https://github.com/lucide-icons/lucide . Copyright Lucide Contributors.
+- Twurple: MIT, https://github.com/twurple/twurple . Direct Twitch authentication and EventSub client; dependency license files are included in the application archive.
 - The icon and select chevron are raster/vector renderings of Lucide's existing MonitorX and ChevronDown icons.
 - Node.js SQLite bindings and SQLite: licenses are included with the Electron runtime.
 - Inno Setup: installer license, https://jrsoftware.org/files/is/license.txt . Build-time tool, not copied into the runtime.

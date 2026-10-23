@@ -9,9 +9,10 @@ const { Store } = require('../core/store.cjs');
 const { Engine } = require('../core/engine.cjs');
 const { createServer } = require('../core/server.cjs');
 
-test('loopback API separates OBS reads and authenticated triggers', async () => {
+test('loopback API is read-only and rejects every legacy trigger credential', async () => {
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-server-')));
   const store = new Store(root); store.saveSettings({ acknowledged: true });
+  store.setMeta('botKey', 'retired-credential-test-only');
   const engine = new Engine(store);
   const server = createServer({ store, engine, root: path.join(__dirname, '..'), port: 0 });
   const port = await server.listen(), base = `http://127.0.0.1:${port}`;
@@ -30,12 +31,10 @@ test('loopback API separates OBS reads and authenticated triggers', async () => 
       http.get(base + '/api/state', { headers: { ...overlay, Host: 'evil.example' } }, response => { response.resume(); resolve(response.statusCode); }).on('error', reject);
     });
     assert.equal(badHost, 403);
-    const result = await (await fetch(base + '/api/redeem', { method: 'POST', headers: bot, body })).json();
-    assert.equal(result.decision, 'accepted');
-    const duplicate = await (await fetch(base + '/api/redeem', { method: 'POST', headers: bot, body })).json();
-    assert.equal(duplicate.duplicate, true);
-    assert.equal((await fetch(base + '/api/redeem', { method: 'POST', headers: bot, body: '{broken' })).status, 400);
-    assert.equal((await fetch(base + '/api/redeem', { method: 'POST', headers: bot, body: ' '.repeat(5000) })).status, 413);
+    assert.equal((await fetch(base + '/api/redeem', { method: 'POST', headers: bot, body })).status, 403);
+    assert.equal((await fetch(base + '/api/redeem', { method: 'POST', headers: bot, body: '{broken' })).status, 403);
+    assert.equal(engine.active, null);
+    assert.equal(engine.queue.length, 0);
     assert.equal((await fetch(base + '/api/sound?event=wrong', { headers: overlay })).status, 404);
   } finally { server.close(); engine.dispose(); store.close(); }
 });

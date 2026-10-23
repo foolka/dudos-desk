@@ -530,6 +530,39 @@ svg {
   margin-top: 18px;
 }
 
+.b-rewards {
+  max-width: 1100px;
+}
+.b-rewards__account {
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+.b-rewards__account .b-inline {
+  margin-top: 12px;
+}
+.b-rewards__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+}
+@media screen and (max-width: 1000px) {
+  .b-rewards__list {
+    grid-template-columns: 1fr;
+  }
+}
+.b-rewards__item {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+.b-rewards__limits {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+}
+
 .b-sidebar {
   width: 230px;
   flex: none;

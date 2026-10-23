@@ -55,6 +55,22 @@ async function state() { return page.evaluate(async () => (await window.desk.sta
     await page.locator('[data-field=errorCount]').fill('10');
     await page.locator('#effect-form button[type=submit]').click();
     await page.waitForFunction(() => document.querySelector('#save-status').textContent === 'Сохранено');
+    await page.locator('[data-view=rewards]').click();
+    assert.equal(await page.locator('[data-reward-form]').count(), 2);
+    const reward = page.locator('[data-reward-form=normal]');
+    await reward.locator('[data-reward-field=title]').fill('Test reward');
+    await reward.locator('[data-reward-field=cost]').fill('250');
+    await page.waitForTimeout(1100);
+    assert.equal(await reward.locator('[data-reward-field=title]').inputValue(), 'Test reward');
+    await reward.locator('button[type=submit]').click();
+    assert.equal((await state()).twitch.rewards[0].cost, 250);
+    assert.equal((await state()).twitch.rewards[0].cooldown, 0);
+    assert.equal((await state()).twitch.rewards[0].remoteId, undefined);
+    await page.setViewportSize({ width: 900, height: 680 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.setViewportSize({ width: 1280, height: 820 });
+    await page.locator('#toast').waitFor({ state: 'hidden' });
+    await page.screenshot({ path: path.join(output, 'rewards.png') });
     await page.locator('[data-view=connection]').click();
     const before = await state();
     await page.locator('#audio-target').selectOption('off');
@@ -82,6 +98,8 @@ async function state() { return page.evaluate(async () => (await window.desk.sta
     assert.equal(after.effects[0].duration, 17); assert.equal(after.effects[0].weight, 12); assert.equal(after.effects[0].volume, 0);
     assert.equal(after.settings.audioTarget, 'off'); assert.equal(after.settings.acknowledged, true);
     assert.equal(after.overlayUrl.split('#')[1], overlayKey);
+    assert.equal(after.twitch.rewards[0].title, 'Test reward');
+    assert.equal(after.twitch.rewards[0].cost, 250);
     // Test-mode ports are ephemeral; a production source keeps the fixed port.
     await source.goto(after.overlayUrl);
     await page.waitForFunction(async () => (await window.desk.state()).value.obsConnected);

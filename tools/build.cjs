@@ -10,7 +10,7 @@ const sass = require('sass');
     out: path.join(root, 'release'), overwrite: true, asar: true, prune: true, icon: path.join(root, 'assets/icon.ico'), appVersion: require('../package.json').version,
     ignore: file => {
       const first = file.replace(/\\/g, '/').replace(/^\//, '').split('/')[0];
-      return !!first && !['assets', 'core', 'ui', 'overlay', 'integration', 'node_modules', 'main.cjs', 'preload.cjs', 'effect-preload.cjs', 'package.json'].includes(first);
+      return !!first && !['assets', 'core', 'ui', 'overlay', 'node_modules', 'main.cjs', 'preload.cjs', 'effect-preload.cjs', 'package.json', 'twitch-client.json'].includes(first);
     },
     win32metadata: { CompanyName: 'FermionaPlay', FileDescription: 'Dudos Desk', ProductName: 'Dudos Desk' }
   });

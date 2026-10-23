@@ -15,6 +15,23 @@ function fixture(t, options = {}) {
 }
 function redemption() { return { category: 'normal', rewardId: randomUUID(), redemptionId: randomUUID(), user: 'Viewer' }; }
 
+test('missing OBS holds without consuming a redemption and resumes queued work only when healthy', async t => {
+  let ready = false;
+  const { store, engine } = fixture(t, { ready: () => ready });
+  store.saveSettings({ acknowledged: true });
+  const r = redemption();
+  assert.equal((await engine.redeem(r)).reason, 'obsNotReady');
+  assert.equal(store.redemption(r.rewardId + ':' + r.redemptionId), null);
+  ready = true;
+  assert.equal((await engine.redeem(r)).decision, 'accepted');
+  await engine.redeem(redemption());
+  ready = false;
+  engine.finish(engine.active.eventId);
+  assert.equal(engine.active, null); assert.equal(engine.queue.length, 1);
+  ready = true; engine.pump();
+  assert.ok(engine.active); assert.equal(engine.queue.length, 0);
+});
+
 test('profile, source keys and effect settings survive a restart', t => {
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-store-')));
   let s = new Store(root);

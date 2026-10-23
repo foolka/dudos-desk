@@ -7,6 +7,10 @@ const { Store, atomic, selectProfile } = require('./core/store.cjs');
 const { Engine } = require('./core/engine.cjs');
 const { sourceGuard } = require('./core/obs.cjs');
 const { createServer, PORT } = require('./core/server.cjs');
+const { TwitchAuth } = require('./core/twitch-auth.cjs');
+const { Twitch } = require('./core/twitch.cjs');
+const { ObsRecovery } = require('./core/obs-control.cjs');
+const { prepareObs } = require('./core/obs-setup.cjs');
 const test = process.argv.includes('--test-mode');
 const startTray = process.argv.includes('--start-tray');
 let startupError;
@@ -18,7 +22,7 @@ if (!primary) app.quit();
 const profile = app.getPath('userData');
 const editorUrl = pathToFileURL(path.join(__dirname, 'ui/index.html')).href;
 const effectUrl = pathToFileURL(path.join(__dirname, 'overlay/index.html')).href;
-let win, tray, store, engine, server, port, effectWindow, closing = false, shortcut = false;
+let win, tray, store, engine, server, port, effectWindow, auth, twitch, recovery, sourceTimer, closing = false, shortcut = false;
 
 function show() { if (win && !win.isDestroyed()) { win.show(); if (win.isMinimized()) win.restore(); win.focus(); } }
 function secretLoad() {
@@ -27,12 +31,22 @@ function secretLoad() {
   if (!safeStorage.isEncryptionAvailable()) throw Error('secureStorage');
   return safeStorage.decryptString(fs.readFileSync(file));
 }
+function privateSave(name, value) {
+  if (!safeStorage.isEncryptionAvailable()) throw Error('secureStorage');
+  atomic(path.join(profile, name), safeStorage.encryptString(JSON.stringify(value)));
+}
+function privateLoad(name) {
+  const file = path.join(profile, name);
+  if (!fs.existsSync(file)) return null;
+  if (!safeStorage.isEncryptionAvailable()) throw Error('secureStorage');
+  return JSON.parse(safeStorage.decryptString(fs.readFileSync(file)));
+}
 function theme() { nativeTheme.themeSource = store.settings().theme; win?.setBackgroundColor(store.settings().theme === 'dark' ? '#191e21' : '#f4f7f8'); }
 function state() {
   return { version: app.getVersion(), effects: store.effects(), settings: store.settings(), runtime: engine.view(),
     overlayUrl: `http://127.0.0.1:${port}/overlay#${store.meta('overlayKey')}`, obsConnected: server.connected(), history: store.history(),
     displays: screen.getAllDisplays().map((d, i) => ({ id: String(d.id), label: d.label || `Display ${i + 1}`, width: d.size.width, height: d.size.height })),
-    hasPassword: fs.existsSync(path.join(profile, 'obs.bin')), profile, shortcut, test };
+    hasPassword: fs.existsSync(path.join(profile, 'obs.bin')), auth: auth.view(), twitch: twitch.view(), obsRecovery: recovery.view(), waitForObs: store.meta('waitForObs') !== false, profile, shortcut, test };
 }
 function secureWindow(window, url) {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -69,9 +83,21 @@ app.whenReady().then(async () => {
   if (!primary) return;
   if (startupError) throw startupError;
   store = new Store(profile); store.backup();
-  engine = new Engine(store, { guard: settings => sourceGuard(settings, secretLoad()) });
+  engine = new Engine(store, { guard: settings => sourceGuard(settings, secretLoad()), ready: () => store.meta('waitForObs') === false || !!server?.connected() });
   server = createServer({ store, engine, root: __dirname, port: test ? 0 : PORT });
   port = await server.listen();
+  auth = new TwitchAuth({ saved: privateLoad('auth.bin'), pending: privateLoad('pending-auth.bin'), save: value => privateSave('auth.bin', value), savePending: value => privateSave('pending-auth.bin', value) });
+  twitch = new Twitch({ auth, store, engine });
+  recovery = new ObsRecovery({
+    overlay: { url: () => `http://127.0.0.1:${port}/overlay#${store.meta('overlayKey')}`, view: () => ({ obsClients: server.connected() ? 1 : 0 }) },
+    engine: { playing: () => !!engine.active },
+    store: { meta: (key, fallback) => store.meta(key) ?? fallback, log: message => store.log('obsRecovery', { reason: message }) },
+    config: test ? null : privateLoad('obs-control.bin')
+  });
+  auth.on('authorized', () => { if (!test) { engine.stop(); void twitch.connect(); } });
+  auth.on('expired', () => twitch.stop());
+  sourceTimer = setInterval(() => engine.pump(), 500); sourceTimer.unref();
+  if (!test) { recovery.start(); auth.resume(); if (auth.saved) void twitch.connect(); }
   win = new BrowserWindow({ width: 1280, height: 860, minWidth: 900, minHeight: 680, title: 'Dudos Desk', show: false,
     icon: path.join(__dirname, 'assets/icon.ico'), autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
@@ -110,11 +136,32 @@ app.whenReady().then(async () => {
       return sourceGuard(store.settings(), secretLoad());
     },
     copyUrl: () => clipboard.writeText(state().overlayUrl),
-    copyScript: category => {
-      if (!['normal', 'strong'].includes(category)) throw Error('invalidValue');
-      let script = fs.readFileSync(path.join(__dirname, 'integration/StreamerBot.cs'), 'utf8');
-      script = script.replace('__DUDOS_KEY__', store.meta('botKey')).replace('__DUDOS_CATEGORY__', category).replace('__DUDOS_PORT__', String(port));
-      clipboard.writeText(script);
+    login: () => { if (test) throw Error('testOnly'); return auth.start(require('./twitch-client.json').clientId); },
+    cancelLogin: () => auth.cancel(),
+    openLogin: () => { const url = auth.view().pending?.url; if (url) return shell.openExternal(url); },
+    logout: () => { twitch.stop(); engine.stop(); auth.logout(); },
+    saveReward: ({ category, reward }) => twitch.save(category, reward),
+    publishReward: category => { if (test) throw Error('testOnly'); return twitch.publish(category); },
+    deleteReward: async category => {
+      if (test) throw Error('testOnly');
+      const result = await dialog.showMessageBox(win, { type: 'question', message: 'Удалить награду из Twitch? / Delete this Twitch reward?', buttons: ['Отмена / Cancel', 'Удалить / Delete'], defaultId: 0, cancelId: 0 });
+      if (result.response === 1) await twitch.remove(category);
+    },
+    waitForObs: value => store.setMeta('waitForObs', value !== false),
+    obsAuto: value => { if (value && !recovery.config) throw Error('obsSetupRequired'); store.setMeta('obsAutoRecover', value === true); },
+    obsSetup: async () => {
+      if (test) throw Error('testOnly');
+      const file = path.join(app.getPath('appData'), 'obs-studio/plugin_config/obs-websocket/config.json');
+      const result = prepareObs(file, {
+        running: () => /\"obs64\.exe\"/i.test(require('node:child_process').execFileSync('tasklist.exe', ['/FI', 'IMAGENAME eq obs64.exe', '/FO', 'CSV', '/NH'], { encoding: 'utf8', windowsHide: true })),
+        backup: raw => privateSave(`obs-before-setup-${Date.now()}.bin`, { file, raw })
+      });
+      if (!result.prepared) await recovery.configure(result.config);
+      privateSave('obs-control.bin', result.config);
+      if (result.prepared) recovery.usePrepared(result.config);
+      atomic(path.join(profile, 'obs.bin'), safeStorage.encryptString(result.config.password));
+      store.saveSettings({ obsPort: result.config.port });
+      store.setMeta('obsAutoRecover', true);
     },
     backup: () => { store.backup(); },
     openProfile: () => shell.openPath(profile),
@@ -124,7 +171,7 @@ app.whenReady().then(async () => {
   for (const [name, fn] of Object.entries(actions)) ipcMain.handle('desk:' + name, async (event, input) => {
     if (closing || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame || event.senderFrame.url !== editorUrl) throw Error('untrustedFrame');
     try { return { ok: true, value: await fn(input) }; }
-    catch (error) { return { ok: false, error: error.code === 'EACCES' ? 'fileAccess' : error.message }; }
+    catch (error) { return { ok: false, error: name === 'obsSetup' ? (/закройте OBS|OBS или его настройки/.test(error.message) ? 'obsCloseFirst' : 'obsSetupFailed') : error.code === 'EACCES' ? 'fileAccess' : error.message }; }
   });
   const effectActions = {
     state: () => engine.active,
@@ -163,6 +210,7 @@ app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => {
   if (closing) return; closing = true;
   globalShortcut.unregisterAll();
+  clearInterval(sourceTimer); recovery?.close(); twitch?.close(); auth?.dispose();
   try { engine?.dispose(); } catch {}
   if (effectWindow && !effectWindow.isDestroyed()) effectWindow.destroy();
   server?.close(); tray?.destroy();

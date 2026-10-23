@@ -2,9 +2,9 @@ const { EventEmitter } = require('node:events');
 const { choose, payload } = require('./model.cjs');
 
 class Engine extends EventEmitter {
-  constructor(store, { guard = async () => ({ decision: 'allow' }), now = Date.now, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+  constructor(store, { guard = async () => ({ decision: 'allow' }), ready = () => true, now = Date.now, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
     super();
-    this.store = store; this.guard = guard; this.now = now; this.setTimer = setTimer; this.clearTimer = clearTimer;
+    this.store = store; this.guard = guard; this.ready = ready; this.now = now; this.setTimer = setTimer; this.clearTimer = clearTimer;
     this.queue = []; this.active = null; this.timer = null; this.delayed = null; this.epoch = 0; this.chain = Promise.resolve(); this.closed = false; this.pending = 0;
   }
   view() { return { active: this.active, queue: this.queue, delayed: this.delayed && { id: this.delayed.id, at: this.delayed.at }, paused: this.store.settings().paused }; }
@@ -35,6 +35,7 @@ class Engine extends EventEmitter {
     if (this.now() >= deadline) return { ok: false, decision: 'hold', reason: 'requestExpired' };
     let reason = this.reason();
     if (reason || epoch !== this.epoch) return { ok: false, decision: 'hold', reason: reason || 'stopped' };
+    if (!this.ready()) return { ok: false, decision: 'hold', reason: 'obsNotReady' };
     if (this.store.settings().guard) {
       const result = await this.guard(this.store.settings());
       if (this.now() >= deadline) return { ok: false, decision: 'hold', reason: 'requestExpired' };
@@ -47,9 +48,10 @@ class Engine extends EventEmitter {
       }
     }
     let effect;
+    if (!this.ready()) return { ok: false, decision: 'hold', reason: 'obsNotReady' };
     try { effect = choose(this.store.effects(), input.category); }
     catch { return { ok: false, decision: 'hold', reason: 'emptyCategory' }; }
-    const item = payload(effect, input.user, this.store.settings(), this.now());
+    const item = { ...payload(effect, input.user, this.store.settings(), this.now()), requiresObs: true };
     const result = { ok: true, decision: 'accepted', eventId: item.eventId, effect: item.id };
     this.store.remember(key, result);
     this.enqueue(item);
@@ -78,6 +80,7 @@ class Engine extends EventEmitter {
   }
   pump() {
     if (this.active || !this.queue.length || this.store.settings().paused || this.closed) return;
+    if (this.queue[0].requiresObs && !this.ready()) return;
     this.active = { ...this.queue.shift(), startedAt: this.now() };
     this.active.endsAt = this.active.startedAt + this.active.duration * 1000;
     const id = this.active.eventId;

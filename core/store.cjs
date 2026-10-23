@@ -49,7 +49,6 @@ class Store {
         this.setMeta('id', randomUUID());
         this.setMeta('settings', normalizeSettings());
         this.setMeta('overlayKey', randomBytes(32).toString('hex'));
-        this.setMeta('botKey', randomBytes(32).toString('hex'));
         for (const id of Object.keys(EFFECTS)) this.writeEffect(normalizeEffect(id));
         this.db.exec('PRAGMA user_version=1; COMMIT');
       }

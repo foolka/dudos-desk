@@ -8,7 +8,7 @@ function equal(value, expected) {
   return typeof value === 'string' && Buffer.byteLength(value) === Buffer.byteLength(expected) && timingSafeEqual(Buffer.from(value), Buffer.from(expected));
 }
 
-// OBS uses a separate read-only key; no public endpoint changes app settings.
+// OBS is read-only; redemptions arrive exclusively from authenticated Twitch.
 function createServer({ store, engine, root, port = PORT }) {
   let lastObs = 0;
   const server = http.createServer(async (req, res) => {
@@ -40,14 +40,6 @@ function createServer({ store, engine, root, port = PORT }) {
         const file = path.join(store.root, 'media', active.sound);
         const types = { '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.flac': 'audio/flac', '.m4a': 'audio/mp4' };
         return reply(200, fs.readFileSync(file), types[path.extname(file)] || 'application/octet-stream');
-      }
-      if (req.method === 'POST' && url.pathname === '/api/redeem' && equal(bearer, store.meta('botKey'))) {
-        if (!String(req.headers['content-type']).startsWith('application/json')) return reply(415, {});
-        if (Number(req.headers['content-length']) > 4096) return reply(413, {});
-        const chunks = []; let length = 0;
-        for await (const chunk of req) { length += chunk.length; if (length > 4096) return reply(413, {}); chunks.push(chunk); }
-        const result = await engine.redeem(JSON.parse(Buffer.concat(chunks).toString('utf8')));
-        return reply(200, result);
       }
       return reply(403, { error: 'unauthorized' });
     } catch { return reply(400, { error: 'requestFailed' }); }
