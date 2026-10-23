@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const root = path.resolve(__dirname, '..');
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-ui-'));
+const profile = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-ui-')));
 const output = path.join(root, 'docs/screenshots'); fs.mkdirSync(output, { recursive: true });
 let app, page, browser;
 const errors = [];

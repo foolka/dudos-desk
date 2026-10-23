@@ -8,7 +8,7 @@ const { Store, selectProfile } = require('../core/store.cjs');
 const { Engine } = require('../core/engine.cjs');
 
 function fixture(t, options = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-test-'));
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-test-')));
   const store = new Store(root); const engine = new Engine(store, options);
   t.after(() => { engine.dispose(); store.close(); });
   return { root, store, engine };
@@ -16,7 +16,7 @@ function fixture(t, options = {}) {
 function redemption() { return { category: 'normal', rewardId: randomUUID(), redemptionId: randomUUID(), user: 'Viewer' }; }
 
 test('profile, source keys and effect settings survive a restart', t => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-store-'));
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-store-')));
   let s = new Store(root);
   const id = s.meta('id'), key = s.meta('overlayKey');
   s.saveEffect('bsod', { duration: 17, volume: 0 }); s.saveSettings({ theme: 'dark', language: 'uk' }); s.close();
@@ -26,14 +26,14 @@ test('profile, source keys and effect settings survive a restart', t => {
   assert.ok(fs.readdirSync(path.join(root, 'backups')).some(n => n.endsWith('.sqlite')));
 });
 test('missing existing database never silently creates an empty profile', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-missing-'));
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-missing-')));
   const s = new Store(root); s.close();
   fs.renameSync(path.join(root, 'dudos.sqlite'), path.join(root, 'saved-original.sqlite'));
   assert.throws(() => new Store(root), /profileMissing/);
   assert.equal(fs.existsSync(path.join(root, 'dudos.sqlite')), false);
 });
 test('damaged database is preserved instead of reset', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-damaged-'));
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-damaged-')));
   const file = path.join(root, 'dudos.sqlite'); fs.writeFileSync(file, 'preserve this corrupt data');
   assert.throws(() => new Store(root)); assert.equal(fs.readFileSync(file, 'utf8'), 'preserve this corrupt data');
 });
@@ -43,6 +43,17 @@ test('test profile cannot be the real profile or its child', () => {
   assert.throws(() => selectProfile(root, true, path.join(root, 'child')));
   assert.throws(() => selectProfile(root, true));
   assert.equal(selectProfile(root, false, 'ignored'), root);
+});
+
+test('a redirected profile is refused without creating a database', () => {
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-redirect-')));
+  const target = path.join(root, 'target'), redirected = path.join(root, 'redirected');
+  fs.mkdirSync(target);
+  fs.symlinkSync(target, redirected, process.platform === 'win32' ? 'junction' : 'dir');
+  try {
+    assert.throws(() => new Store(redirected), /profileRedirected/);
+    assert.equal(fs.existsSync(path.join(target, 'dudos.sqlite')), false);
+  } finally { fs.unlinkSync(redirected); }
 });
 test('warning gates real redemptions and tests', async t => {
   const { engine } = fixture(t);
@@ -56,7 +67,7 @@ test('concurrent duplicate redemption is played once', async t => {
   assert.equal(store.history().filter(v => v.code === 'started').length, 1);
 });
 test('deduplication survives process restart', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-dedupe-'));
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-dedupe-')));
   let s = new Store(root); s.saveSettings({ acknowledged: true }); let e = new Engine(s); const r = redemption();
   await e.redeem(r); e.dispose(); s.close();
   s = new Store(root); e = new Engine(s);

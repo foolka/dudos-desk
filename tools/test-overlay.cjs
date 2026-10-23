@@ -22,7 +22,7 @@ async function pixels(page, png) {
   }, png.toString('base64'));
 }
 (async () => {
-  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-overlay-'));
+  const profile = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-overlay-')));
   const store = new Store(profile); store.saveSettings({ acknowledged: true, audioTarget: 'off' });
   const engine = new Engine(store);
   let server = createServer({ store, engine, root, port: 0 });

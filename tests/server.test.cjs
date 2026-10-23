@@ -10,7 +10,7 @@ const { Engine } = require('../core/engine.cjs');
 const { createServer } = require('../core/server.cjs');
 
 test('loopback API separates OBS reads and authenticated triggers', async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-server-'));
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-server-')));
   const store = new Store(root); store.saveSettings({ acknowledged: true });
   const engine = new Engine(store);
   const server = createServer({ store, engine, root: path.join(__dirname, '..'), port: 0 });
