@@ -16,6 +16,15 @@ test('all legacy effect types have bounded editable settings', () => {
     assert.throws(() => normalizeEffect(id, { sound: '../../secret.wav' }));
   }
 });
+test('captcha size defaults to the original size and accepts only bounded integers', () => {
+  for (const id of ['text_captcha', 'arrow_captcha']) {
+    assert.equal(normalizeEffect(id).captchaScale, 100);
+    for (const captchaScale of [50, 75, 100, 135, 200]) assert.equal(normalizeEffect(id, { captchaScale }).captchaScale, captchaScale);
+    for (const captchaScale of [0, 49, 201, 75.5, null, '', '100', NaN, Infinity]) assert.throws(() => normalizeEffect(id, { captchaScale }));
+  }
+  assert.equal(normalizeEffect('bsod', { captchaScale: 200 }).captchaScale, undefined);
+});
+
 test('weighted draw visits exactly the intended buckets', () => {
   const e = ['bsod', 'error_flood', 'vignette'].map((id, i) => normalizeEffect(id, { weight: i + 1 }));
   const result = [0, 1, 2, 3, 4, 5].map(n => choose(e, 'normal', () => n).id);
@@ -33,7 +42,8 @@ test('settings reject unsupported modes and invalid guard configuration', () => 
 test('each payload has a new identity and frozen settings', () => {
   const e = normalizeEffect('text_captcha'); const settings = normalizeSettings();
   const a = payload(e, '<viewer>', settings); const b = payload(e, '<viewer>', settings);
-  e.volume = 0; assert.equal(a.volume, 35); assert.notEqual(a.eventId, b.eventId);
+  e.volume = 0; e.captchaScale = 50;
+  assert.equal(a.captchaScale, 100); assert.equal(a.volume, 35); assert.notEqual(a.eventId, b.eventId);
   assert.match(a.code, /^[A-Z0-9]{6}$/); assert.equal(a.arrows.length, 6);
 });
 test('all interface messages exist in three languages', () => {

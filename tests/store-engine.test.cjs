@@ -32,6 +32,21 @@ test('missing OBS holds without consuming a redemption and resumes queued work o
   assert.ok(engine.active); assert.equal(engine.queue.length, 0);
 });
 
+test('inactive game refunds without a mirror, but an allowed mode still cannot start without OBS', async t => {
+  let decision = 'refund';
+  const { store, engine } = fixture(t, { ready: () => false, guard: async () => ({ decision, reason: 'noPcSource' }) });
+  store.saveSettings({ acknowledged: true, guard: true, pcSources: ['Game'] });
+  assert.equal((await engine.redeem(redemption())).decision, 'refund');
+  assert.equal(engine.active, null);
+  assert.equal(engine.queue.length, 0);
+  decision = 'allow';
+  const input = redemption();
+  assert.deepEqual(await engine.redeem(input), { ok: false, decision: 'hold', reason: 'obsNotReady' });
+  assert.equal(engine.active, null);
+  assert.equal(engine.queue.length, 0);
+  assert.equal(store.redemption(input.rewardId + ':' + input.redemptionId), null);
+});
+
 test('profile, source keys and effect settings survive a restart', t => {
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-store-')));
   let s = new Store(root);
@@ -42,6 +57,23 @@ test('profile, source keys and effect settings survive a restart', t => {
   assert.equal(s.effects()[0].duration, 17); assert.equal(s.effects()[0].volume, 0); assert.equal(s.settings().theme, 'dark');
   assert.ok(fs.readdirSync(path.join(root, 'backups')).some(n => n.endsWith('.sqlite')));
 });
+test('legacy captcha settings keep their values and independent sizes survive restart', t => {
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-size-')));
+  let store = new Store(root);
+  t.after(() => store.close());
+  const legacy = { ...store.effects().find(e => e.id === 'text_captcha'), duration: 29, volume: 17, weight: 61 };
+  delete legacy.captchaScale;
+  store.writeEffect(legacy);
+  store.close(); store = new Store(root);
+  const restored = store.effects().find(e => e.id === legacy.id);
+  assert.deepEqual(restored, { ...legacy, captchaScale: 100 });
+  store.saveEffect('text_captcha', { ...restored, captchaScale: 75 });
+  store.saveEffect('arrow_captcha', { ...store.effects().find(e => e.id === 'arrow_captcha'), captchaScale: 150 });
+  store.close(); store = new Store(root);
+  assert.deepEqual(store.effects().find(e => e.id === legacy.id), { ...legacy, captchaScale: 75 });
+  assert.equal(store.effects().find(e => e.id === 'arrow_captcha').captchaScale, 150);
+});
+
 test('missing existing database never silently creates an empty profile', () => {
   const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dudos-missing-')));
   const s = new Store(root); s.close();

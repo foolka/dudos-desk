@@ -17,13 +17,14 @@ function integer(value, min, max) {
 function normalizeEffect(id, input = {}) {
   const defaults = EFFECTS[id];
   if (!defaults) throw Error('unknownEffect');
-  const effect = { ...defaults, enabled: true, volume: 35, sound: '', errorCount: 42, ...input };
+  const effect = { ...defaults, enabled: true, volume: 35, sound: '', errorCount: 42, captchaScale: 100, ...input };
   if (!['normal', 'strong'].includes(effect.category) || typeof effect.enabled !== 'boolean') throw Error('invalidValue');
   if (typeof effect.sound !== 'string' || !/^(?:[a-f0-9-]{36}\.(?:wav|mp3|ogg|flac|m4a))?$/.test(effect.sound)) throw Error('invalidSound');
   return {
     id, category: effect.category, enabled: effect.enabled, sound: effect.sound,
     weight: integer(effect.weight, 0, 1000), volume: integer(effect.volume, 0, 100),
-    duration: integer(effect.duration, 1, 120), errorCount: integer(effect.errorCount, 1, 100)
+    duration: integer(effect.duration, 1, 120), errorCount: integer(effect.errorCount, 1, 100),
+    ...(id.endsWith('captcha') ? { captchaScale: integer(effect.captchaScale, 50, 200) } : {})
   };
 }
 

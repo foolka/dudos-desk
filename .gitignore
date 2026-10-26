@@ -6,3 +6,6 @@ test-output/
 *.bin
 .env*
 profile/
+native/*.exe
+/core/taskbar-native.node
+/test-results/taskbar/

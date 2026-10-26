@@ -3,11 +3,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const sass = require('sass');
 
-(async () => {
+(async () => { require('./build-taskbar.cjs').buildTaskbar();
   const root = path.resolve(__dirname, '..');
+  const native = require('./build-native.cjs').buildNative();
   fs.writeFileSync(path.join(root, 'ui/style.css'), sass.compile(path.join(root, 'ui/styles/main.scss')).css);
   const [built] = await packager({ dir: root, name: 'DudosDesk', executableName: 'DudosDesk', platform: 'win32', arch: 'x64',
-    out: path.join(root, 'release'), overwrite: true, asar: true, prune: true, icon: path.join(root, 'assets/icon.ico'), appVersion: require('../package.json').version,
+    out: path.join(root, 'release'), overwrite: true, asar: { unpack: '**/*.node' }, prune: true, icon: path.join(root, 'assets/icon.ico'), appVersion: require('../package.json').version,
     ignore: file => {
       const first = file.replace(/\\/g, '/').replace(/^\//, '').split('/')[0];
       return !!first && !['assets', 'core', 'ui', 'overlay', 'node_modules', 'main.cjs', 'preload.cjs', 'effect-preload.cjs', 'package.json', 'twitch-client.json'].includes(first);
@@ -18,5 +19,7 @@ const sass = require('sass');
   for (const name of ['README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md']) fs.copyFileSync(path.join(root, name), path.join(built, name));
   fs.cpSync(path.join(root, 'docs'), path.join(built, 'docs'), { recursive: true });
   fs.copyFileSync(path.join(root, 'assets/icon.ico'), path.join(built, 'resources/app.ico'));
+  fs.mkdirSync(path.join(built, 'resources/native'), { recursive: true });
+  fs.copyFileSync(native, path.join(built, 'resources/native/CaptchaInput.exe'));
   console.log(built);
 })().catch(error => { console.error(error); process.exitCode = 1; });

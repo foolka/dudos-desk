@@ -36,5 +36,15 @@ test('loopback API is read-only and rejects every legacy trigger credential', as
     assert.equal(engine.active, null);
     assert.equal(engine.queue.length, 0);
     assert.equal((await fetch(base + '/api/sound?event=wrong', { headers: overlay })).status, 404);
+    engine.enqueue({ id: 'text_captcha', eventId: randomUUID(), duration: 30, code: 'ABC234', user: 'TEST' });
+    const eventId = engine.active.eventId;
+    engine.updateCaptcha({ eventId, text: 'AB', error: false });
+    const snapshot = await (await fetch(base + '/api/state', { headers: overlay })).json();
+    assert.deepEqual(snapshot.active.captcha, { text: 'AB', progress: 0, error: false, solved: false });
+    for (const endpoint of ['/api/state', '/api/progress', '/api/complete', '/api/stop']) {
+      assert.equal((await fetch(base + endpoint, { method: 'POST', headers: { ...overlay, 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId, text: 'ABC234' }) })).status, 403);
+    }
+    assert.equal(engine.active.captcha.text, 'AB');
+    assert.equal(engine.active.captcha.solved, false);
   } finally { server.close(); engine.dispose(); store.close(); }
 });

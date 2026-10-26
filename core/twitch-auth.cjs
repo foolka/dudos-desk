@@ -1,6 +1,6 @@
 const { EventEmitter } = require("node:events");
 const SCOPES = ["channel:manage:redemptions"];
-const LOGIN_SCOPES = [...SCOPES];
+const LOGIN_SCOPES = [...SCOPES, "user:write:chat"];
 let sdkPromise;
 function loadSdk() {
   return (sdkPromise ||= Promise.all([

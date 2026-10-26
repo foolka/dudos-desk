@@ -62,8 +62,13 @@
   }
   function render(active) {
     if (!active) { if (current) clear(); return; }
-    if (active.eventId === current?.eventId) return;
+    if (active.eventId === current?.eventId) {
+      if (!desktop) { current = active; paintCaptcha(); }
+      return;
+    }
     clear(); current = active;
+    current.captcha = active.captcha || { text: '', progress: 0, error: false, solved: false };
+    progress = current.captcha.progress;
     const t = copy[active.language] || copy.en;
     document.documentElement.lang = active.language || 'en';
     void sound(active);
@@ -94,6 +99,8 @@
     } else {
       const arrows = active.id === 'arrow_captcha';
       const card = node('div', 'captcha');
+      const scale = Number.isFinite(active.captchaScale) ? Math.min(200, Math.max(50, active.captchaScale)) : 100;
+      card.style.setProperty('--captcha-scale', scale / 100);
       card.append(node('div', 'captcha__title', t[arrows ? 4 : 2]), node('div', 'captcha__hint', t[arrows ? 5 : 3]));
       if (arrows) {
         const row = node('div', 'arrows');
@@ -103,13 +110,20 @@
         card.append(node('div', 'captcha__code', active.code));
         const input = node('input', ''); input.maxLength = 6; input.autocomplete = 'off'; input.spellcheck = false; input.setAttribute('aria-label', t[2]);
         input.readOnly = !desktop;
+        input.addEventListener('input', () => {
+          if (!desktop || current?.eventId !== active.eventId || current.captcha.solved) return;
+          current.captcha.text = input.value; current.captcha.error = false;
+          paintCaptcha(); void publishCaptcha();
+        });
         input.addEventListener('keydown', event => {
-          if (event.key !== 'Enter') return;
-          if (input.value.trim().toUpperCase() === active.code) void window.dudosEffect?.complete(active.eventId);
-          else { input.value = ''; card.querySelector('.captcha__error').textContent = t[6]; }
+          if (!desktop || current?.eventId !== active.eventId || current.captcha.solved || event.key !== 'Enter') return;
+          if (input.value.trim().toUpperCase() === active.code) finishCaptcha();
+          else {
+            current.captcha.text = ''; current.captcha.error = true;
+            paintCaptcha(); void publishCaptcha();
+          }
         });
         card.append(input, node('div', 'captcha__error', ''));
-        if (desktop) timers.push(setTimeout(() => input.focus(), 100));
       }
       if (!preview) {
         const timer = node('div', 'countdown'); card.append(timer);
@@ -117,19 +131,57 @@
         tick();
       }
       stage.append(card);
+      paintCaptcha();
+      if (desktop) {
+        card.tabIndex = -1;
+        (card.querySelector('input') || card).focus({ preventScroll: true });
+        void window.dudosEffect.ready?.(active.eventId);
+      }
     }
     if (!preview) timers.push(setTimeout(() => { if (current?.eventId === active.eventId) clear(); }, Math.max(0, active.endsAt - Date.now()) + 150));
+  }
+  // Update only input feedback, keeping focus, countdown and sound intact.
+  function paintCaptcha() {
+    const state = current?.captcha;
+    if (!state) return;
+    stage.querySelectorAll('.arrow').forEach((tile, index) => tile.classList.toggle('arrow--done', index < state.progress));
+    const input = stage.querySelector('.captcha input');
+    if (input) {
+      if (input.value !== state.text) input.value = state.text;
+      input.readOnly = !desktop || state.solved;
+    }
+    const error = stage.querySelector('.captcha__error');
+    if (error) error.textContent = state.error ? (copy[current.language] || copy.en)[6] : '';
+  }
+  // The OBS page has no write endpoint; only the isolated desktop preload can send input.
+  async function publishCaptcha() {
+    if (!desktop || !current) return false;
+    try {
+      return await window.dudosEffect.progress({ eventId: current.eventId, text: current.captcha.text, progress, error: current.captcha.error });
+    } catch { return false; }
+  }
+  function finishCaptcha() {
+    const id = current.eventId;
+    current.captcha.solved = true;
+    paintCaptcha();
+    void publishCaptcha().then(ok => { if (ok) return window.dudosEffect.complete(id); }).catch(() => {});
   }
   addEventListener('keydown', event => {
     if (!desktop || !current) return;
     if (event.key === 'Escape') { void window.dudosEffect.stop(); return; }
-    if (current.id !== 'arrow_captcha' || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    if (current.id !== 'arrow_captcha' || current.captcha.solved || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
     event.preventDefault();
-    const tiles = [...stage.querySelectorAll('.arrow')];
-    if (event.key === current.arrows[progress]) { tiles[progress++].classList.add('arrow--done'); if (progress === current.arrows.length) void window.dudosEffect.complete(current.eventId); }
-    else { progress = 0; tiles.forEach(el => el.classList.remove('arrow--done')); }
+    if (event.key === current.arrows[progress]) progress++;
+    else progress = 0;
+    current.captcha.progress = progress;
+    paintCaptcha();
+    if (progress === current.arrows.length) finishCaptcha();
+    else void publishCaptcha();
   });
-  if (desktop) { window.dudosEffect.onState(render); void window.dudosEffect.state().then(render); }
+  if (desktop) {
+    window.dudosEffect.onFocus?.(() => (stage.querySelector('.captcha input') || stage.querySelector('.captcha'))?.focus({ preventScroll: true }));
+    window.dudosEffect.onState(render); void window.dudosEffect.state().then(render);
+  }
   else if (preview) {
     addEventListener('message', event => {
       if (event.source !== parent || event.data?.type !== 'preview') return;

@@ -1,0 +1,70 @@
+.b-taskbar {
+    display: block;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line, #849299);
+}
+
+.b-taskbar__title {
+    margin: 0 0 12px;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.b-taskbar__controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.b-taskbar__button,
+.b-taskbar__refresh {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    max-width: 100%;
+    padding: 7px 12px;
+    border: 1px solid var(--line, #849299);
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: normal;
+    cursor: pointer;
+}
+
+.b-taskbar__button:disabled,
+.b-taskbar__refresh:disabled {
+    opacity: .65;
+    cursor: default;
+}
+
+.b-taskbar__refresh {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+}
+
+.b-taskbar__refresh svg,
+.b-taskbar__help svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+}
+
+.b-taskbar__help {
+    display: inline-flex;
+    padding: 5px;
+    cursor: help;
+}
+
+.b-taskbar__status {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}

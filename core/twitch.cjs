@@ -1,4 +1,5 @@
 const { loadSdk } = require('./twitch-auth.cjs');
+const { refundText } = require('./refund-chat.cjs');
 const CATEGORIES = ['normal', 'strong'];
 
 // Zero disables a Twitch limit; identifiers belong to the saved binding, not form input.
@@ -17,19 +18,20 @@ function rewardFields(category, input = {}) {
   return result;
 }
 
+// Omit disabled numeric limits: Twitch accepts positive values only when enabled.
 function twitchFields(r, creating = false) {
   return { title: r.title, prompt: r.prompt, cost: r.cost, background_color: r.color, is_enabled: r.enabled,
     is_user_input_required: false, should_redemptions_skip_request_queue: false,
-    is_max_per_stream_enabled: r.perStream > 0, max_per_stream: r.perStream || 1,
-    is_max_per_user_per_stream_enabled: r.perUser > 0, max_per_user_per_stream: r.perUser || 1,
-    is_global_cooldown_enabled: r.cooldown > 0, global_cooldown_seconds: r.cooldown || 1,
+    is_max_per_stream_enabled: r.perStream > 0, ...(r.perStream > 0 ? { max_per_stream: r.perStream } : {}),
+    is_max_per_user_per_stream_enabled: r.perUser > 0, ...(r.perUser > 0 ? { max_per_user_per_stream: r.perUser } : {}),
+    is_global_cooldown_enabled: r.cooldown > 0, ...(r.cooldown > 0 ? { global_cooldown_seconds: r.cooldown } : {}),
     ...(!creating ? { is_paused: r.paused } : {}) };
 }
 
 class Twitch {
   constructor({ auth, store, engine, sdk = loadSdk, fetchImpl = fetch, changed = () => {} }) {
     Object.assign(this, { auth, store, engine, sdk, fetchImpl, changed });
-    this.epoch = 0; this.status = 'signed_out'; this.inflight = new Map(); this.writes = new Set();
+    this.epoch = 0; this.status = 'signed_out'; this.inflight = new Map(); this.writes = new Set(); this.waiting = new Map();
     this.onRetry = () => this.reconnect();
     auth.on('retry', this.onRetry);
   }
@@ -37,7 +39,7 @@ class Twitch {
   client() { return this.auth.saved?.clientId || ''; }
   owns(r) { return !!this.account() && r.account === this.account() && r.clientId === this.client(); }
   rewards() { const saved = this.store.meta('twitchRewards') || {}; return CATEGORIES.map(c => ({ ...rewardFields(c), ...saved[c] })); }
-  view() { return { status: this.status, rewards: this.rewards(), pending: Object.keys(this.store.meta('twitchSettlements') || {}).length }; }
+  view() { return { status: this.status, rewards: this.rewards(), pending: Object.keys(this.store.meta('twitchSettlements') || {}).length, chatPermission: this.auth.saved?.token?.scope?.includes('user:write:chat') === true }; }
   put(r) { this.store.setMeta('twitchRewards', { ...(this.store.meta('twitchRewards') || {}), [r.category]: r }); this.changed(); }
   save(category, input) {
     const existing = this.rewards().find(r => r.category === category);
@@ -49,11 +51,12 @@ class Twitch {
     const account = this.account(), client = this.client();
     if (!account || this.closed) throw Error('loginRequired');
     const provider = await this.auth.getProvider();
-    let token = await provider.getAccessTokenForUser(account, ['channel:manage:redemptions']);
+    const chat = endpoint === 'chat/messages';
+    let token = await provider.getAccessTokenForUser(account, [chat ? 'user:write:chat' : 'channel:manage:redemptions']);
     const valid = () => { if (this.closed || account !== this.account() || client !== this.client()) throw Error('accountChanged'); };
     const send = access => {
       valid();
-      return this.fetchImpl('https://api.twitch.tv/helix/' + endpoint + '?' + new URLSearchParams({ broadcaster_id: account, ...params }), {
+      return this.fetchImpl('https://api.twitch.tv/helix/' + endpoint + (chat ? '' : '?' + new URLSearchParams({ broadcaster_id: account, ...params })), {
         method, headers: { 'Client-Id': client, Authorization: 'Bearer ' + access, 'Content-Type': 'application/json' },
         body: body && JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(15000)
       });
@@ -122,20 +125,64 @@ class Twitch {
     const run = (async () => {
       const result = await this.engine.redeem({ category: reward.category, rewardId: reward.remoteId, redemptionId: event.id, user: event.user });
       if (epoch !== this.epoch || !this.owns(reward)) return;
-      if (!['accepted', 'refund'].includes(result.decision)) { this.status = result.reason; this.changed(); return; }
-      const settlement = { account: reward.account, clientId: reward.clientId, rewardId: reward.remoteId, id: event.id, desired: result.decision === 'accepted' ? 'FULFILLED' : 'CANCELED' };
+      if (!['accepted', 'refund'].includes(result.decision)) {
+        this.recordWaiting(key, result.reason, event.user);
+        this.status = result.reason; this.changed(); return;
+      }
+      this.waiting.delete(key);
+      const settlement = { account: reward.account, clientId: reward.clientId, rewardId: reward.remoteId, id: event.id, desired: result.decision === 'accepted' ? 'FULFILLED' : 'CANCELED', reason: result.reason, user: event.user, language: this.store.settings().language };
       this.store.setMeta('twitchSettlements', { ...(this.store.meta('twitchSettlements') || {}), [key]: settlement });
       await this.settle(key, settlement);
-    })().catch(() => { this.status = 'twitchRetry'; this.changed(); }).finally(() => this.inflight.delete(key));
+      if (epoch === this.epoch) { this.status = 'twitchConnected'; this.changed(); }
+    })().catch(() => {
+      if (epoch !== this.epoch) return;
+      this.recordWaiting(key, 'twitchRetry', event.user);
+      this.status = 'twitchRetry'; this.changed();
+    }).finally(() => this.inflight.delete(key));
     this.inflight.set(key, run); return run;
+  }
+  // Record a changed hold reason once, not on every reconciliation poll.
+  recordWaiting(key, reason, user) {
+    if (this.waiting.get(key) === reason) return;
+    this.waiting.delete(key);
+    this.waiting.set(key, reason);
+    if (this.waiting.size > 300) this.waiting.delete(this.waiting.keys().next().value);
+    this.store.log('hold', { reason, user });
   }
   async settle(key, job) {
     if (!this.owns(job)) return;
     const existing = await this.request('GET', 'channel_points/custom_rewards/redemptions', { reward_id: job.rewardId, id: job.id });
-    const status = existing.data[0]?.status;
+    let status = existing.data[0]?.status;
     if (!status) throw Error('twitchRequestFailed');
-    if (status === 'UNFULFILLED') await this.request('PATCH', 'channel_points/custom_rewards/redemptions', { reward_id: job.rewardId, id: job.id }, { status: job.desired });
+    if (status === 'UNFULFILLED') {
+      const updated = await this.request('PATCH', 'channel_points/custom_rewards/redemptions', { reward_id: job.rewardId, id: job.id }, { status: job.desired });
+      status = updated.data?.[0]?.status;
+      if (status !== job.desired) throw Error('twitchRequestFailed');
+    }
     const pending = this.store.meta('twitchSettlements') || {}; delete pending[key]; this.store.setMeta('twitchSettlements', pending);
+    if (status === 'CANCELED' && job.desired === 'CANCELED') await this.notifyRefund(job);
+  }
+  // Mark before sending: an ambiguous network response must not duplicate chat messages.
+  async notifyRefund(job) {
+    if (!this.owns(job)) return;
+    const message = refundText(job);
+    if (!message) return;
+    const key = job.rewardId.toLowerCase() + ':' + job.id.toLowerCase();
+    const receipt = this.store.redemption(key);
+    if (!receipt || receipt.decision !== 'refund' || receipt.notificationAttempted) return;
+    this.store.remember(key, { ...receipt, notificationAttempted: true });
+    this.store.log('refunded', { reason: job.reason, user: job.user });
+    if (!this.view().chatPermission) {
+      this.store.log('refundChatFailed', { reason: 'chatPermissionRequired', user: job.user });
+      return;
+    }
+    try {
+      const result = await this.request('POST', 'chat/messages', {}, { broadcaster_id: job.account, sender_id: job.account, message });
+      if (result.data?.[0]?.is_sent !== true) throw Error('chatNotSent');
+      this.store.log('refundChatSent', { user: job.user });
+    } catch {
+      this.store.log('refundChatFailed', { reason: 'chatSendUnconfirmed', user: job.user });
+    }
   }
   async tick() {
     if (this.busy || !this.account() || this.closed) return;

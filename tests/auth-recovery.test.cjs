@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { TwitchAuth, SCOPES } = require("../core/twitch-auth.cjs");
+const { TwitchAuth, SCOPES, LOGIN_SCOPES } = require("../core/twitch-auth.cjs");
 const CLIENT = "a".repeat(30),
   USER = "100";
 const token = {
@@ -95,6 +95,20 @@ test("saved identity is restoring, not proof of valid authorization", async (t) 
   await f.auth.getProvider();
   assert.equal(f.auth.view().status, "ready");
   assert.equal(f.refreshes, 0);
+});
+
+test("legacy reward-only login stays valid; new login requests chat permission too", async t => {
+  const f = fixture(t);
+  await f.auth.getProvider();
+  assert.equal(f.auth.invalid, false);
+  assert.deepEqual(SCOPES, ['channel:manage:redemptions']);
+  f.sdk.startDeviceCodeFlow = async (client, scopes) => {
+    assert.equal(client, CLIENT);
+    assert.deepEqual(scopes, ['channel:manage:redemptions', 'user:write:chat']);
+    return { verificationUri: 'https://www.twitch.tv/activate', deviceCode: 'fixture', userCode: 'fixture', expiresIn: 600, interval: 5 };
+  };
+  await f.auth.start(CLIENT);
+  assert.deepEqual(f.auth.pending.scopes, LOGIN_SCOPES);
 });
 test("network, 429 and 5xx validation failures keep credentials and recover without refresh or login", async (t) => {
   for (const error of [

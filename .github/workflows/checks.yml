@@ -13,5 +13,6 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run styles
+      - run: npm run native
       - run: npm test
       - run: npm audit --audit-level=high

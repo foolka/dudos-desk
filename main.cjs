@@ -11,6 +11,7 @@ const { TwitchAuth } = require('./core/twitch-auth.cjs');
 const { Twitch } = require('./core/twitch.cjs');
 const { ObsRecovery } = require('./core/obs-control.cjs');
 const { prepareObs } = require('./core/obs-setup.cjs');
+const { CaptchaInput } = require('./core/captcha-input.cjs');
 const test = process.argv.includes('--test-mode');
 const startTray = process.argv.includes('--start-tray');
 let startupError;
@@ -23,6 +24,7 @@ const profile = app.getPath('userData');
 const editorUrl = pathToFileURL(path.join(__dirname, 'ui/index.html')).href;
 const effectUrl = pathToFileURL(path.join(__dirname, 'overlay/index.html')).href;
 let win, tray, store, engine, server, port, effectWindow, auth, twitch, recovery, sourceTimer, closing = false, shortcut = false;
+let captchaInput;
 
 function show() { if (win && !win.isDestroyed()) { win.show(); if (win.isMinimized()) win.restore(); win.focus(); } }
 function secretLoad() {
@@ -57,6 +59,7 @@ function secureWindow(window, url) {
 async function syncDesktop() {
   if (test || closing) return;
   const active = engine.active;
+  captchaInput?.stop();
   if (effectWindow && !effectWindow.isDestroyed()) { effectWindow.destroy(); effectWindow = null; }
   if (!active) return;
   const interactive = active.id.endsWith('captcha');
@@ -68,13 +71,15 @@ async function syncDesktop() {
   secureWindow(window, effectUrl);
   window.setAlwaysOnTop(true, 'screen-saver');
   window.setIgnoreMouseEvents(!interactive);
+  window.once('closed', () => captchaInput?.stop(active.eventId));
+  window.on('blur', () => captchaInput?.stop(active.eventId));
   window.webContents.once('render-process-gone', () => { if (engine.active?.eventId === active.eventId) engine.finish(active.eventId, 'renderFailed'); });
   window.once('unresponsive', () => { if (engine.active?.eventId === active.eventId) engine.finish(active.eventId, 'renderFailed'); });
   try {
     await window.loadURL(effectUrl);
     if (window.isDestroyed()) return;
     if (engine.active?.eventId !== active.eventId || closing) { window.destroy(); return; }
-    if (interactive) { window.show(); window.focus(); } else window.showInactive();
+    if (!interactive) window.showInactive();
   } catch { if (engine.active?.eventId === active.eventId) engine.finish(active.eventId, 'renderFailed'); }
 }
 
@@ -83,6 +88,10 @@ app.whenReady().then(async () => {
   if (!primary) return;
   if (startupError) throw startupError;
   store = new Store(profile); store.backup();
+  captchaInput = new CaptchaInput({
+    file: path.join(app.isPackaged ? process.resourcesPath : __dirname, 'native/CaptchaInput.exe'),
+    report: reason => store.log('captchaInputWarning', { reason })
+  });
   engine = new Engine(store, { guard: settings => sourceGuard(settings, secretLoad()), ready: () => store.meta('waitForObs') === false || !!server?.connected() });
   server = createServer({ store, engine, root: __dirname, port: test ? 0 : PORT });
   port = await server.listen();
@@ -102,6 +111,7 @@ app.whenReady().then(async () => {
     icon: path.join(__dirname, 'assets/icon.ico'), autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true } });
   secureWindow(win, editorUrl);
+  require('./core/taskbar.cjs').attachTaskbar({ app, shell, ipcMain, win, test, name: 'Dudos Desk', appId: 'com.fermionaplay.dudosdesk' });
   win.on('closed', () => { if (!closing) app.quit(); });
   win.webContents.session.setPermissionRequestHandler((_, __, cb) => cb(false));
   let lastEvent = null;
@@ -175,7 +185,19 @@ app.whenReady().then(async () => {
   });
   const effectActions = {
     state: () => engine.active,
-    complete: id => { if (engine.active?.id.endsWith('captcha')) engine.finish(id, 'solved'); },
+    ready: id => {
+      if (test || engine.active?.eventId !== id || !engine.active.id.endsWith('captcha') || effectWindow.captchaReady) return;
+      effectWindow.captchaReady = true;
+      effectWindow.show(); effectWindow.moveTop(); effectWindow.focus(); effectWindow.webContents.focus();
+      effectWindow.webContents.send('effect:focus');
+      captchaInput.start(effectWindow.getNativeWindowHandle(), id);
+    },
+    progress: value => engine.updateCaptcha(value),
+    complete: id => {
+      const solved = engine.solveCaptcha(id);
+      if (solved) captchaInput.stop(id);
+      return solved;
+    },
     stop: () => engine.stop(),
     sound: id => {
       if (engine.active?.eventId !== id || !engine.active.sound) return null;
@@ -210,6 +232,7 @@ app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => {
   if (closing) return; closing = true;
   globalShortcut.unregisterAll();
+  captchaInput?.stop();
   clearInterval(sourceTimer); recovery?.close(); twitch?.close(); auth?.dispose();
   try { engine?.dispose(); } catch {}
   if (effectWindow && !effectWindow.isDestroyed()) effectWindow.destroy();

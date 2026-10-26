@@ -35,7 +35,7 @@ class Engine extends EventEmitter {
     if (this.now() >= deadline) return { ok: false, decision: 'hold', reason: 'requestExpired' };
     let reason = this.reason();
     if (reason || epoch !== this.epoch) return { ok: false, decision: 'hold', reason: reason || 'stopped' };
-    if (!this.ready()) return { ok: false, decision: 'hold', reason: 'obsNotReady' };
+    // Resolve a mode refund even if its scene also hides the OBS mirror.
     if (this.store.settings().guard) {
       const result = await this.guard(this.store.settings());
       if (this.now() >= deadline) return { ok: false, decision: 'hold', reason: 'requestExpired' };
@@ -48,6 +48,7 @@ class Engine extends EventEmitter {
       }
     }
     let effect;
+    // Never enqueue an allowed effect until the OBS mirror is ready.
     if (!this.ready()) return { ok: false, decision: 'hold', reason: 'obsNotReady' };
     try { effect = choose(this.store.effects(), input.category); }
     catch { return { ok: false, decision: 'hold', reason: 'emptyCategory' }; }
@@ -83,10 +84,44 @@ class Engine extends EventEmitter {
     if (this.queue[0].requiresObs && !this.ready()) return;
     this.active = { ...this.queue.shift(), startedAt: this.now() };
     this.active.endsAt = this.active.startedAt + this.active.duration * 1000;
+    if (['text_captcha', 'arrow_captcha'].includes(this.active.id)) {
+      this.active.captcha = { text: '', progress: 0, error: false, solved: false };
+    }
     const id = this.active.eventId;
     this.timer = this.setTimer(() => this.finish(id, 'timeout'), this.active.duration * 1000);
     this.store.log('started', { effect: this.active.id, user: this.active.user });
     this.changed();
+  }
+  // Only the trusted desktop window supplies bounded, transient captcha input.
+  updateCaptcha(input) {
+    const active = this.active;
+    if (!active?.captcha || active.captcha.solved || this.now() >= active.endsAt || input?.eventId !== active.eventId) return false;
+    let next;
+    if (active.id === 'text_captcha') {
+      if (typeof input.text !== 'string' || input.text.length > 6 || typeof input.error !== 'boolean') return false;
+      next = { text: input.text, progress: 0, error: input.error, solved: false };
+    } else {
+      if (!Number.isInteger(input.progress) || input.progress < 0 || input.progress > active.arrows.length) return false;
+      next = { text: '', progress: input.progress, error: false, solved: false };
+    }
+    if (JSON.stringify(active.captcha) === JSON.stringify(next)) return true;
+    active.captcha = next;
+    this.changed();
+    return true;
+  }
+  // Retain the final frame for two OBS polls without extending the effect deadline.
+  solveCaptcha(id) {
+    const active = this.active;
+    if (!active?.captcha || active.eventId !== id || active.captcha.solved || this.now() >= active.endsAt) return false;
+    const correct = active.id === 'text_captcha'
+      ? active.captcha.text.trim().toUpperCase() === active.code
+      : active.captcha.progress === active.arrows.length;
+    if (!correct) return false;
+    active.captcha.solved = true;
+    this.clearTimer(this.timer);
+    this.timer = this.setTimer(() => this.finish(id, 'solved'), Math.min(750, active.endsAt - this.now()));
+    this.changed();
+    return true;
   }
   finish(id, reason = 'finished') {
     if (!this.active || this.active.eventId !== id) return false;

@@ -59,6 +59,8 @@ function renderEffect() {
       <div class="b-editor__chance"><span>${esc(t('chance'))}</span><strong id="chance"></strong></div>
       <div class="b-form__row">${field('duration', selected.endsWith('captcha') ? 'timeout' : 'duration', e.duration, 'type="number" min="1" max="120" step="1" required', 'durationHelp')}
       ${selected === 'error_flood' ? field('errorCount', 'count', e.errorCount, 'type="number" min="1" max="100" step="1" required') : ''}</div>
+      ${selected.endsWith('captcha') ? `<label class="b-field"><span>${esc(t('captchaSize'))}${help('captchaSizeHelp')}<output id="captcha-size-value" for="captcha-size">${e.captchaScale}%</output></span>
+        <input id="captcha-size" type="range" data-field="captchaScale" min="50" max="200" step="5" value="${e.captchaScale}"></label>` : ''}
       <label class="b-field"><span>${esc(t('volume'))}<output id="volume-value">${e.volume}%</output></span><input type="range" data-field="volume" min="0" max="100" value="${e.volume}"></label>
       <div class="b-field"><span>${esc(t('sound'))}</span><div class="b-inline"><span id="sound-name">${esc(t(e.sound ? 'customSound' : 'defaultSound'))}</span>${iconButton('sound', 'chooseSound', 'folder-open')}${iconButton('resetSound', 'resetSound', 'rotate-ccw')}</div></div>
       <div class="b-editor__actions"><button type="submit" class="b-primary">${icon('save')}${esc(t('save'))}</button><span id="save-status" class="b-muted">${esc(t(dirty ? 'unsaved' : 'saved'))}</span></div>
@@ -76,17 +78,19 @@ function renderConnection() {
     <label class="b-field"><span>${esc(t('audioTarget'))}${help('audioHelp')}</span><select id="audio-target">${options(['local', 'obs', 'both', 'off'], s.audioTarget)}</select></label></div></section>
     <section><h2>${esc(t('obsProtection'))}${help('obsProtectionHelp')}</h2><div class="b-inline">${button('obsSetup', 'obsSetup', 'shield-check')}<label class="b-check"><input id="obs-auto" type="checkbox"${state.obsRecovery.enabled ? ' checked' : ''}>${esc(t('obsAuto'))}</label></div><div id="obs-recovery-status" class="b-muted b-connection__spacing"></div>
       <label class="b-check b-connection__spacing"><input id="wait-for-obs" type="checkbox"${state.waitForObs ? ' checked' : ''}>${esc(t('waitForObs'))}${help('waitForObsHelp')}</label></section>
-    <section><h2>${esc(t('guardTitle'))}${help('guardHelp')}</h2><form id="guard-form" class="b-form">
+    <section><h2>${esc(t('guardTitle'))}${help('guardHelp')}</h2>
+    <div class="b-notice b-notice--inline">${icon('triangle-alert')}<div><strong>${esc(t('sourceNamesTitle'))}</strong><div>${esc(t('sourceNamesBody'))}</div></div></div>
+    <form id="guard-form" class="b-form">
       <label class="b-check"><input id="guard-enabled" type="checkbox"${s.guard ? ' checked' : ''}>${esc(t('guard'))}</label>
       <div class="b-form__row"><label class="b-field"><span>${esc(t('pcSources'))}</span><textarea id="pc-sources" rows="3">${esc(s.pcSources.join('\n'))}</textarea></label><label class="b-field"><span>${esc(t('blockedSources'))}</span><textarea id="blocked-sources" rows="3">${esc(s.blockedSources.join('\n'))}</textarea></label></div>
       <div class="b-form__row"><label class="b-field"><span>${esc(t('obsPort'))}</span><input id="obs-port" type="number" min="1024" max="65535" value="${s.obsPort}" required></label><div class="b-field"><span>${esc(t('password'))}</span><div class="b-inline"><input id="obs-password" type="password" autocomplete="new-password" maxlength="500" placeholder="${state.hasPassword ? '••••••••' : ''}" aria-label="${esc(t('password'))}">${iconButton('password', 'passwordSave', 'save')}</div></div></div>
       <div class="b-inline"><button type="submit" class="b-primary">${icon('save')}${esc(t('save'))}</button>${button('checkGuard', 'checkGuard', 'radio')}<span id="guard-result" role="status"></span></div>
-    </form></section></div>`;
+    </form></section><desk-taskbar></desk-taskbar></div>`;
 }
 // Reward drafts stay local until the user explicitly creates or updates Twitch.
 function renderRewards() {
   const rewardInput = (r, key, label, type = 'text', extra = '') => `<label class="b-field"><span>${esc(t(label))}</span><input data-reward-field="${key}" type="${type}" value="${esc(r[key])}" ${extra}></label>`;
-  $('#main').innerHTML = `<div class="b-rewards"><section class="b-rewards__account"><h1>Twitch</h1><div id="auth-status" role="status"></div><div id="auth-code"></div><div class="b-inline">${button('login', 'login', 'log-in')}${button('openLogin', 'openLogin', 'external-link')}${button('cancelLogin', 'cancelLogin', 'x')}${button('logout', 'logout', 'log-out')}</div></section>
+  $('#main').innerHTML = `<div class="b-rewards"><section class="b-rewards__account"><h1>Twitch</h1><div id="auth-status" role="status"></div><div id="chat-permission" class="b-notice b-notice--inline" hidden>${esc(t('chatPermissionRequired'))}</div><div id="auth-code"></div><div class="b-inline">${button('login', 'login', 'log-in')}${button('openLogin', 'openLogin', 'external-link')}${button('cancelLogin', 'cancelLogin', 'x')}${button('logout', 'logout', 'log-out')}</div></section>
     <div class="b-rewards__list">${state.twitch.rewards.map(saved => {
       const r = rewardDrafts[saved.category] || saved;
       return `<form data-reward-form="${r.category}" class="b-rewards__item"><div class="b-editor__heading"><h2>${esc(t(r.category))}</h2><span class="b-muted">${esc(t(saved.remoteId ? 'linked' : 'draftReward'))}</span></div>
@@ -112,7 +116,8 @@ function updateHistory() {
 function updateStatus() {
   if (!state) return;
   const r = state.runtime;
-  if ($('#runtime')) $('#runtime').textContent = r.delayed ? `${t('delayed')} ${Math.max(0, Math.ceil((r.delayed.at - Date.now()) / 1000))} ${t('seconds')}` : r.paused ? t('paused') : r.active ? `${t('active')}: ${t(r.active.id)} · ${r.queue.length}` : `${t('ready')} · ${t('queued')}: ${r.queue.length}`;
+  const waitingForObs = state.waitForObs && !state.obsConnected;
+  if ($('#runtime')) $('#runtime').textContent = r.delayed ? `${t('delayed')} ${Math.max(0, Math.ceil((r.delayed.at - Date.now()) / 1000))} ${t('seconds')}` : r.paused ? t('paused') : r.active ? `${t('active')}: ${t(r.active.id)} · ${r.queue.length}` : `${t(waitingForObs ? 'obsNotReady' : 'ready')} · ${t('queued')}: ${r.queue.length}`;
   if ($('#obs-status')) { $('#obs-status').textContent = t(state.obsConnected ? 'connected' : 'disconnected'); $('#obs-status').className = state.obsConnected ? 'b-status is-connected' : 'b-status'; }
   if ($('#obs-recovery-status')) $('#obs-recovery-status').textContent = state.settings.language === 'ru' ? state.obsRecovery.status : t(state.obsRecovery.connected ? 'connected' : state.obsRecovery.enabled ? 'obsWaiting' : 'obsDisabled');
   if ($('#obs-auto')) $('#obs-auto').checked = state.obsRecovery.enabled;
@@ -122,7 +127,8 @@ function updateStatus() {
     $('#auth-code').textContent = a.pending?.code || '';
     for (const action of ['openLogin', 'cancelLogin']) $(`[data-action=${action}]`).hidden = !a.pending;
     $('[data-action=logout]').hidden = !a.user;
-    $('[data-action=login]').hidden = !!a.pending || (!!a.user && !a.reauthRequired);
+    $('[data-action=login]').hidden = !!a.pending || (!!a.user && !a.reauthRequired && state.twitch.chatPermission);
+    $('#chat-permission').hidden = !a.user || state.twitch.chatPermission;
   }
 }
 function updateChance() {
@@ -154,8 +160,9 @@ document.addEventListener('input', event => {
   draft[key] = event.target.type === 'checkbox' ? event.target.checked : event.target.type === 'number' || event.target.type === 'range' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value;
   dirty = true; $('#save-status').textContent = t('unsaved');
   if ($('#volume-value')) $('#volume-value').textContent = draft.volume + '%';
+  if ($('#captcha-size-value')) $('#captcha-size-value').textContent = draft.captchaScale + '%';
   updateChance();
-  if (key === 'errorCount') preview();
+  if (key === 'errorCount' || key === 'captchaScale') preview();
 });
 document.addEventListener('change', async event => {
   try {

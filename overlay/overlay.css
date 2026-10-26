@@ -54,7 +54,8 @@ html, body {
   position: absolute;
   left: 50%;
   top: 48%;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) scale(var(--captcha-scale, 1));
+  transform-origin: center;
   width: 820px;
   padding: 38px;
   background: #f8fafb;
