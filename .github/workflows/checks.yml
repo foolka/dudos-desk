@@ -15,4 +15,5 @@ jobs:
       - run: npm run styles
       - run: npm run native
       - run: npm test
+      - run: npm run test:desktop
       - run: npm audit --audit-level=high

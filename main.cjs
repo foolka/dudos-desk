@@ -12,6 +12,7 @@ const { Twitch } = require('./core/twitch.cjs');
 const { ObsRecovery } = require('./core/obs-control.cjs');
 const { prepareObs } = require('./core/obs-setup.cjs');
 const { CaptchaInput } = require('./core/captcha-input.cjs');
+const { createDesktopWindow } = require('./core/desktop-window.cjs');
 const test = process.argv.includes('--test-mode');
 const startTray = process.argv.includes('--start-tray');
 let startupError;
@@ -64,13 +65,9 @@ async function syncDesktop() {
   if (!active) return;
   const interactive = active.id.endsWith('captcha');
   const display = screen.getAllDisplays().find(d => String(d.id) === store.settings().displayId) || screen.getPrimaryDisplay();
-  const window = new BrowserWindow({ ...display.bounds, show: false, frame: false, transparent: true, resizable: false,
-    skipTaskbar: true, focusable: interactive, alwaysOnTop: true, hasShadow: false, title: 'Dudos Desk Effect',
-    webPreferences: { preload: path.join(__dirname, 'effect-preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, backgroundThrottling: false, autoplayPolicy: 'no-user-gesture-required', focusOnNavigation: interactive } });
+  const window = createDesktopWindow(BrowserWindow, display, interactive, path.join(__dirname, 'effect-preload.cjs'));
   effectWindow = window;
   secureWindow(window, effectUrl);
-  window.setAlwaysOnTop(true, 'screen-saver');
-  window.setIgnoreMouseEvents(!interactive);
   window.once('closed', () => captchaInput?.stop(active.eventId));
   window.on('blur', () => captchaInput?.stop(active.eventId));
   window.webContents.once('render-process-gone', () => { if (engine.active?.eventId === active.eventId) engine.finish(active.eventId, 'renderFailed'); });

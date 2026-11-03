@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.4
+
+- Fixed the uncovered taskbar-height strip under desktop effects. Windows now receives the full selected monitor bounds again after creating the hidden window, including monitors with nonzero coordinates and display scaling.
+- Preserved passive effects without focus requests, interactive captcha input, emergency stop and OBS mirroring. Profiles, rewards, source URLs and taskbar shortcuts are unchanged.
+- Added native hidden-window geometry and edge-pixel regression checks, plus taskbar-side and scaled-coordinate unit tests. The checks do not show desktop effects or install input hooks.
+
 ## 0.3.3
 
 - Added an explicit Windows taskbar pin button and live status in the standalone app settings, in RU/UK/EN. Windows asks for confirmation; unsupported systems show manual instructions.

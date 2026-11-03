@@ -1,7 +1,7 @@
 {
   "name": "dudos-desk",
   "productName": "Dudos Desk",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "private": true,
   "description": "Local playful desktop effects and OBS mirror for streamers",
   "author": "FermionaPlay",
@@ -15,6 +15,7 @@
     "test": "node --test tests/*.test.cjs",
     "test:ui": "node tools/test-ui.cjs",
     "test:overlay": "node tools/test-overlay.cjs",
+    "test:desktop": "node tools/test-desktop.cjs",
     "assets": "node tools/create-assets.cjs",
     "styles": "sass ui/styles/main.scss ui/style.css --no-source-map",
     "build": "node tools/build.cjs",
@@ -22,6 +23,12 @@
     "portable": "node tools/package-portable.cjs"
   },
   "dependencies": { "lucide": "0.468.0", "@twurple/api": "8.2.0", "@twurple/auth": "8.2.0", "@twurple/eventsub-ws": "8.2.0" },
+  "overrides": {
+    "@electron/asar": {
+      "glob": "14.0.3",
+      "minimatch": "11.0.2"
+    }
+  },
   "devDependencies": {
     "electron": "42.11.18",
     "@electron/packager": "20.3.0",

@@ -1,6 +1,6 @@
 # Dudos Desk
 
-**Приватная тестовая версия 0.3.3 · Windows 10/11 x64 · RU / UK / EN**
+**Приватная тестовая версия 0.3.4 · Windows 10/11 x64 · RU / UK / EN**
 
 Локальные шуточные помехи поверх игры с отдельным источником для OBS. Основано на механиках прежнего приложения «Дудос»: синий экран, окна ошибок, виньетка, текстовая и стрелочная капчи. Это развлекательное приложение, **не программа для сетевых атак**.
 
@@ -155,6 +155,7 @@ npm run native
 npm test
 npm run test:ui
 npm run test:overlay
+npm run test:desktop
 npm audit --audit-level=high
 npm run build
 $env:ISCC_EXE = 'C:\path\to\ISCC.exe'
