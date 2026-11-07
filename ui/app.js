@@ -30,7 +30,7 @@ function render() {
   document.documentElement.dataset.theme = state.settings.theme;
   previewReady = false;
   $('#app').innerHTML = `<header class="b-header">
-    <div class="b-header__brand"><img src="../assets/icon.png" alt="" width="34" height="34"><strong>Dudos Desk</strong><span class="b-header__version">PRIVATE ${esc(state.version)}</span></div>
+    <div class="b-header__brand"><img src="../assets/icon.png" alt="" width="34" height="34"><strong>Dudos Desk</strong><span class="b-header__version">v${esc(state.version)}</span></div>
     <div class="b-header__tools">${iconButton('theme', 'theme', state.settings.theme === 'dark' ? 'sun' : 'moon')}
       <select id="language" aria-label="${esc(t('language'))}"><option value="ru"${state.settings.language === 'ru' ? ' selected' : ''}>Русский</option><option value="uk"${state.settings.language === 'uk' ? ' selected' : ''}>Українська</option><option value="en"${state.settings.language === 'en' ? ' selected' : ''}>English</option></select>
       ${iconButton('tray', 'tray', 'panel-top-close')}</div>
