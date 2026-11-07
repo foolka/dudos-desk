@@ -10,6 +10,9 @@ function buildNative() {
   if (!fs.existsSync(compiler)) throw Error('Windows .NET Framework C# compiler is required');
   execFileSync(compiler, ['/nologo', '/target:exe', '/platform:x64', '/optimize+', '/out:' + output, path.join(root, 'native/CaptchaInput.cs')], { stdio: 'inherit', windowsHide: true });
   execFileSync(output, ['--self-test'], { stdio: 'inherit', windowsHide: true });
+  const controls = path.join(root, 'native/ControlsInput.exe');
+  execFileSync(compiler, ['/nologo', '/target:exe', '/platform:x64', '/optimize+', '/out:' + controls, path.join(root, 'native/ControlsInput.cs')], { stdio: 'inherit', windowsHide: true });
+  execFileSync(controls, ['--self-test'], { stdio: 'inherit', windowsHide: true });
   return output;
 }
 if (require.main === module) buildNative();

@@ -21,5 +21,6 @@ const sass = require('sass');
   fs.copyFileSync(path.join(root, 'assets/icon.ico'), path.join(built, 'resources/app.ico'));
   fs.mkdirSync(path.join(built, 'resources/native'), { recursive: true });
   fs.copyFileSync(native, path.join(built, 'resources/native/CaptchaInput.exe'));
+  fs.copyFileSync(path.join(root, 'native/ControlsInput.exe'), path.join(built, 'resources/native/ControlsInput.exe'));
   console.log(built);
 })().catch(error => { console.error(error); process.exitCode = 1; });

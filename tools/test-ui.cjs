@@ -44,7 +44,7 @@ async function captchaSize(value) {
 (async () => {
   try {
     await launch();
-    assert.equal((await state()).effects.length, 5);
+    assert.equal((await state()).effects.length, 7);
     assert.equal((await state()).settings.acknowledged, false);
     assert.equal(await page.locator('[data-field=captchaScale]').count(), 0);
     assert.match(await page.locator('#runtime').textContent(), /Ожидание источника OBS/);
@@ -97,6 +97,25 @@ async function captchaSize(value) {
       await page.frameLocator('#preview').locator('.captcha').waitFor();
       await page.screenshot({ path: path.join(output, id + '-size.png') });
     }
+    for (const id of ['invert_wasd', 'invert_mouse']) {
+      await page.locator(`[data-effect=${id}]`).click();
+      assert.equal(await page.locator('[data-field=duration]').inputValue(), '20');
+      assert.equal(await page.locator('[data-field=category]').inputValue(), 'strong');
+      await page.frameLocator('#preview').locator('.b-input-effect').waitFor();
+      assert.equal(await page.locator('[data-field=captchaScale]').count(), 0);
+      for (const language of ['uk', 'en', 'ru']) {
+        await page.locator('#language').selectOption(language);
+        await page.waitForFunction(value => document.documentElement.lang === value, language);
+        await page.frameLocator('#preview').locator('.b-input-effect').waitFor();
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      }
+      await page.locator('[data-field=duration]').fill('25');
+      await page.locator('#effect-form button[type=submit]').click();
+      await page.waitForFunction(() => document.querySelector('#save-status').textContent === 'Сохранено');
+      assert.equal((await state()).effects.find(e => e.id === id).duration, 25);
+      await page.locator('#toast').waitFor({ state: 'hidden' });
+      await page.screenshot({ path: path.join(output, id + '.png') });
+    }
     await page.locator('[data-effect=error_flood]').click();
     await page.frameLocator('#preview').locator('.error').first().waitFor();
     await page.locator('[data-field=errorCount]').fill('10');
@@ -146,7 +165,7 @@ async function captchaSize(value) {
     await page.waitForFunction(() => document.querySelector('#runtime').textContent.startsWith('Готов ·'));
     const overlayKey = before.overlayUrl.split('#')[1];
     const sourceBase = before.overlayUrl.split('/overlay')[0];
-    const sourceState = await source.evaluate(async key => (await fetch('/api/state', { headers: { Authorization: 'Bearer ' + key } })).json(), overlayKey);
+    const sourceState = await source.evaluate(async key => (await fetch('/api/state?version=0.4.0', { headers: { Authorization: 'Bearer ' + key } })).json(), overlayKey);
     assert.equal(sourceState.active, null);
     assert.equal(await source.locator('#stage > *').count(), 0);
     await source.goto('about:blank');
@@ -164,6 +183,7 @@ async function captchaSize(value) {
     assert.equal(after.effects[0].duration, 17); assert.equal(after.effects[0].weight, 12); assert.equal(after.effects[0].volume, 0);
     assert.equal(after.effects.find(e => e.id === 'text_captcha').captchaScale, 75);
     assert.equal(after.effects.find(e => e.id === 'arrow_captcha').captchaScale, 150);
+    for (const id of ['invert_wasd', 'invert_mouse']) assert.equal(after.effects.find(e => e.id === id).duration, 25);
     assert.equal(after.settings.audioTarget, 'off'); assert.equal(after.settings.acknowledged, true);
     assert.equal(after.settings.guard, true); assert.deepEqual(after.settings.pcSources, ['Game']);
     assert.equal(after.overlayUrl.split('#')[1], overlayKey);

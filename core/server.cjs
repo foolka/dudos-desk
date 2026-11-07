@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { timingSafeEqual } = require('node:crypto');
 const PORT = 18778;
+const OVERLAY_VERSION = '0.4.0';
 
 function equal(value, expected) {
   return typeof value === 'string' && Buffer.byteLength(value) === Buffer.byteLength(expected) && timingSafeEqual(Buffer.from(value), Buffer.from(expected));
@@ -31,8 +32,9 @@ function createServer({ store, engine, root, port = PORT }) {
         return reply(200, fs.readFileSync(path.join(root, 'overlay', name)), type + '; charset=utf-8');
       }
       if (req.method === 'GET' && url.pathname === '/api/state' && equal(bearer, store.meta('overlayKey'))) {
+        if (url.searchParams.get('version') !== OVERLAY_VERSION) return reply(409, { error: 'reload', version: OVERLAY_VERSION });
         lastObs = Date.now();
-        return reply(200, { active: engine.active, now: Date.now() });
+        return reply(200, { active: engine.active, now: Date.now(), version: OVERLAY_VERSION });
       }
       if (req.method === 'GET' && url.pathname === '/api/sound' && equal(bearer, store.meta('overlayKey'))) {
         const active = engine.active;
@@ -54,4 +56,4 @@ function createServer({ store, engine, root, port = PORT }) {
     close: () => { server.closeAllConnections(); server.close(); }
   };
 }
-module.exports = { createServer, PORT, equal };
+module.exports = { createServer, PORT, equal, OVERLAY_VERSION };

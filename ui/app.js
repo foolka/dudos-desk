@@ -1,6 +1,6 @@
 let state, selected = 'bsod', view = 'effects', draft = null, dirty = false, previewReady = false, toastTimer;
 const rewardDrafts = {}, rewardDirty = new Set();
-const icons = { bsod: 'monitor-x', error_flood: 'panels-top-left', vignette: 'scan-eye', text_captcha: 'text-cursor-input', arrow_captcha: 'move' };
+const icons = { bsod: 'monitor-x', error_flood: 'panels-top-left', vignette: 'scan-eye', text_captcha: 'text-cursor-input', arrow_captcha: 'move', invert_wasd: 'keyboard', invert_mouse: 'mouse-pointer-2' };
 const $ = selector => document.querySelector(selector);
 const t = key => messages[state?.settings.language || 'ru'][key] || key;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));

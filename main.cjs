@@ -12,6 +12,8 @@ const { Twitch } = require('./core/twitch.cjs');
 const { ObsRecovery } = require('./core/obs-control.cjs');
 const { prepareObs } = require('./core/obs-setup.cjs');
 const { CaptchaInput } = require('./core/captcha-input.cjs');
+const { ControlsInput } = require('./core/controls-input.cjs');
+const { INPUT_EFFECTS } = require('./core/model.cjs');
 const { createDesktopWindow } = require('./core/desktop-window.cjs');
 const test = process.argv.includes('--test-mode');
 const startTray = process.argv.includes('--start-tray');
@@ -25,7 +27,7 @@ const profile = app.getPath('userData');
 const editorUrl = pathToFileURL(path.join(__dirname, 'ui/index.html')).href;
 const effectUrl = pathToFileURL(path.join(__dirname, 'overlay/index.html')).href;
 let win, tray, store, engine, server, port, effectWindow, auth, twitch, recovery, sourceTimer, closing = false, shortcut = false;
-let captchaInput;
+let captchaInput, controlsInput, quitReady = false;
 
 function show() { if (win && !win.isDestroyed()) { win.show(); if (win.isMinimized()) win.restore(); win.focus(); } }
 function secretLoad() {
@@ -61,14 +63,23 @@ async function syncDesktop() {
   if (test || closing) return;
   const active = engine.active;
   captchaInput?.stop();
+  void controlsInput?.stop();
   if (effectWindow && !effectWindow.isDestroyed()) { effectWindow.destroy(); effectWindow = null; }
   if (!active) return;
+  if (INPUT_EFFECTS.includes(active.id)) {
+    if (!shortcut) { store.log('inputWarning', { effect: active.id, reason: 'inputSafetyUnavailable' }); engine.finish(active.eventId, 'inputUnavailable'); return; }
+    void controlsInput.start(active);
+  }
   const interactive = active.id.endsWith('captcha');
   const display = screen.getAllDisplays().find(d => String(d.id) === store.settings().displayId) || screen.getPrimaryDisplay();
   const window = createDesktopWindow(BrowserWindow, display, interactive, path.join(__dirname, 'effect-preload.cjs'));
   effectWindow = window;
   secureWindow(window, effectUrl);
-  window.once('closed', () => captchaInput?.stop(active.eventId));
+  window.once('closed', () => {
+    captchaInput?.stop(active.eventId);
+    void controlsInput?.stop(active.eventId);
+    if (!closing && INPUT_EFFECTS.includes(active.id) && engine.active?.eventId === active.eventId) engine.finish(active.eventId, 'renderFailed');
+  });
   window.on('blur', () => captchaInput?.stop(active.eventId));
   window.webContents.once('render-process-gone', () => { if (engine.active?.eventId === active.eventId) engine.finish(active.eventId, 'renderFailed'); });
   window.once('unresponsive', () => { if (engine.active?.eventId === active.eventId) engine.finish(active.eventId, 'renderFailed'); });
@@ -90,6 +101,20 @@ app.whenReady().then(async () => {
     report: reason => store.log('captchaInputWarning', { reason })
   });
   engine = new Engine(store, { guard: settings => sourceGuard(settings, secretLoad()), ready: () => store.meta('waitForObs') === false || !!server?.connected() });
+  controlsInput = new ControlsInput({
+    file: path.join(app.isPackaged ? process.resourcesPath : __dirname, 'native/ControlsInput.exe'),
+    ended: (eventId, reason) => {
+      if (engine?.active?.eventId !== eventId) return;
+      store.log('inputWarning', { effect: engine.active.id, reason });
+      if (reason === 'inputEmergency') engine.stop();
+      else {
+        if (reason === 'inputFocusLost') {
+          try { engine.pause(true); } catch { engine.stop(); return; }
+        }
+        engine.finish(eventId, reason);
+      }
+    }
+  });
   server = createServer({ store, engine, root: __dirname, port: test ? 0 : PORT });
   port = await server.listen();
   auth = new TwitchAuth({ saved: privateLoad('auth.bin'), pending: privateLoad('pending-auth.bin'), save: value => privateSave('auth.bin', value), savePending: value => privateSave('pending-auth.bin', value) });
@@ -226,7 +251,9 @@ app.whenReady().then(async () => {
   app.quit();
 });
 app.on('window-all-closed', () => app.quit());
-app.on('before-quit', () => {
+app.on('before-quit', event => {
+  if (quitReady) return;
+  event.preventDefault();
   if (closing) return; closing = true;
   globalShortcut.unregisterAll();
   captchaInput?.stop();
@@ -234,5 +261,8 @@ app.on('before-quit', () => {
   try { engine?.dispose(); } catch {}
   if (effectWindow && !effectWindow.isDestroyed()) effectWindow.destroy();
   server?.close(); tray?.destroy();
-  try { store?.close(); } catch {}
+  void (controlsInput?.stop() || Promise.resolve()).finally(() => {
+    try { store?.close(); } catch {}
+    quitReady = true; app.quit();
+  });
 });

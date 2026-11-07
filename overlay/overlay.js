@@ -1,9 +1,15 @@
 (() => {
+  const VERSION = '0.4.0';
   const stage = document.getElementById('stage');
   const desktop = !!window.dudosEffect;
   const preview = new URLSearchParams(location.search).has('preview');
   if (preview) document.documentElement.classList.add('is-preview');
   const key = location.hash.slice(1);
+  const inputCopy = {
+    ru: { invert_wasd: 'Управление наоборот', invert_mouse: 'Мышь наоборот', keyboard: 'W ↔ S     A ↔ D', mouse: '← →     ↑ ↓' },
+    uk: { invert_wasd: 'Керування навпаки', invert_mouse: 'Миша навпаки', keyboard: 'W ↔ S     A ↔ D', mouse: '← →     ↑ ↓' },
+    en: { invert_wasd: 'Reversed controls', invert_mouse: 'Inverted mouse', keyboard: 'W ↔ S     A ↔ D', mouse: '← →     ↑ ↓' }
+  };
   const copy = {
     ru: ['На вашем стриме возникла проблема. Ему нужно немножко пострадать.', 'Собираем немного хаоса. Скоро отпустим игру.', 'Проверка на стримера', 'Введите код и нажмите Enter', 'Клавиатура подозревается', 'Нажмите стрелки в указанном порядке', 'Не тот код', 'Игровой процесс временно не найден. Попробуйте пережить это.'],
     uk: ['На вашому стрімі виникла проблема. Йому потрібно трішки постраждати.', 'Збираємо трохи хаосу. Скоро відпустимо гру.', 'Перевірка на стримера', 'Введіть код і натисніть Enter', 'Клавіатура під підозрою', 'Натисніть стрілки у вказаному порядку', 'Неправильний код', 'Ігровий процес тимчасово не знайдено. Спробуйте це пережити.'],
@@ -96,7 +102,17 @@
         };
         if (at <= elapsed) draw(); else timers.push(setTimeout(draw, at - elapsed));
       }
-    } else {
+    } else if (['invert_wasd', 'invert_mouse'].includes(active.id)) {
+      const labels = inputCopy[active.language] || inputCopy.en;
+      const banner = node('div', 'b-input-effect');
+      const timer = node('div', 'b-input-effect__time');
+      banner.append(node('div', 'b-input-effect__title', labels[active.id]), node('div', 'b-input-effect__keys', labels[active.id === 'invert_wasd' ? 'keyboard' : 'mouse']), timer);
+      const tick = () => {
+        timer.textContent = (preview ? active.duration : Math.max(0, Math.ceil((active.endsAt - Date.now()) / 1000))) + ' s';
+        if (!preview && current?.eventId === active.eventId) timers.push(setTimeout(tick, 250));
+      };
+      tick(); stage.append(banner);
+    } else if (['text_captcha', 'arrow_captcha'].includes(active.id)) {
       const arrows = active.id === 'arrow_captcha';
       const card = node('div', 'captcha');
       const scale = Number.isFinite(active.captchaScale) ? Math.min(200, Math.max(50, active.captchaScale)) : 100;
@@ -192,7 +208,8 @@
     // Polling reconnects after app or network restarts, without reloading OBS by hand.
     const tick = async () => {
       try {
-        const response = await fetch('/api/state', { headers: { Authorization: 'Bearer ' + key }, signal: AbortSignal.timeout(2000) });
+        const response = await fetch('/api/state?version=' + VERSION, { headers: { Authorization: 'Bearer ' + key }, signal: AbortSignal.timeout(2000) });
+        if (response.status === 409) { clear(); location.reload(); return; }
         if (!response.ok) throw Error('offline');
         const data = await response.json(); lastSuccess = Date.now(); render(data.active);
       } catch { if (Date.now() - lastSuccess > 3000) clear(); }

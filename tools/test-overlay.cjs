@@ -35,7 +35,7 @@ async function pixels(page, png) {
     await page.goto(`http://127.0.0.1:${port}/overlay#${store.meta('overlayKey')}`);
     await page.waitForTimeout(500);
     assert.equal((await pixels(page, await page.screenshot({ omitBackground: true }))).visible, 0);
-    const selectors = { bsod: '.bsod', error_flood: '.error', vignette: '.vignette', text_captcha: '.captcha input', arrow_captcha: '.arrow' };
+    const selectors = { bsod: '.bsod', error_flood: '.error', vignette: '.vignette', text_captcha: '.captcha input', arrow_captcha: '.arrow', invert_wasd: '.b-input-effect', invert_mouse: '.b-input-effect' };
     for (const effect of store.effects()) {
       const active = payload({ ...effect, duration: 10 }, 'TEST', store.settings());
       engine.enqueue(active);
@@ -44,8 +44,28 @@ async function pixels(page, png) {
       assert.ok(alpha.visible > 10000, effect.id + ' is blank');
       if (effect.id.endsWith('captcha')) assert.ok(alpha.visible < alpha.total / 2, effect.id + ' background is opaque');
       if (effect.id === 'text_captcha') assert.equal(await page.locator('input').getAttribute('readonly'), '');
+      if (effect.id.startsWith('invert_')) {
+        assert.ok(alpha.visible < alpha.total / 4);
+        assert.equal(await page.locator('.captcha').count(), 0);
+        const first = parseInt(await page.locator('.b-input-effect__time').textContent(), 10);
+        await page.evaluate(() => { window.originalBanner = document.querySelector('.b-input-effect'); });
+        await page.waitForTimeout(1100);
+        assert.ok(parseInt(await page.locator('.b-input-effect__time').textContent(), 10) < first);
+        assert.equal(await page.evaluate(() => window.originalBanner === document.querySelector('.b-input-effect')), true);
+        if (process.env.DUDOS_OVERLAY_SCREENSHOTS) await page.screenshot({ path: path.join(process.env.DUDOS_OVERLAY_SCREENSHOTS, effect.id + '-obs.png'), omitBackground: true });
+      }
       engine.stop(); await page.waitForFunction(() => document.querySelector('#stage').children.length === 0);
     }
+    // A previously opened source reloads before seeing work on a version mismatch.
+    engine.enqueue(payload({ ...store.effects()[0], duration: 30 }, 'UPGRADE', store.settings()));
+    engine.enqueue(payload({ ...store.effects()[1], duration: 30 }, 'QUEUED', store.settings()));
+    const activeId = engine.active.eventId, queuedId = engine.queue[0].eventId;
+    await page.route('**/api/state?*', route => route.fulfill({ status: 409, contentType: 'application/json', body: '{"error":"reload"}' }), { times: 1 });
+    await page.waitForEvent('load');
+    await page.locator('.bsod').waitFor();
+    assert.equal(engine.active.eventId, activeId);
+    assert.equal(engine.queue[0].eventId, queuedId);
+    engine.stop();
     // Compare scaled geometry at both OBS resolutions without desktop activation.
     for (const viewport of [{ width: 1920, height: 1080 }, { width: 1280, height: 720 }]) {
       await page.setViewportSize(viewport);
@@ -151,6 +171,6 @@ async function pixels(page, png) {
       await desktop.close();
     }
     assert.deepEqual(errors, []);
-    console.log('Overlay: 5 nonblank effects, captcha scale/centering/bounds at 50/100/200% and 1080p/720p, identical desktop and OBS geometry, transparent backgrounds, reconnect, live arrow/text input and errors mirrored to a read-only OBS page, final solved frames and Esc verified without desktop activation.');
+    console.log('Overlay: 7 nonblank effects, input-effect countdowns without hooks, protocol reload preserves active/queued work, captcha scale/centering/bounds, read-only live mirror, transparent backgrounds, reconnect and Esc verified without desktop activation.');
   } finally { await browser.close(); server.close(); engine.dispose(); store.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -135,3 +135,31 @@ const messages = {
     obsUnavailable: 'OBS is unavailable or the sources are misconfigured.', blockedSource: 'A blocked source is active.', noPcSource: 'No PC game source is active.', pcSource: 'A PC game source is active.', secureStorage: 'Windows could not open secure storage.', fileAccess: 'File access denied.', operationFailed: 'The action could not be completed.', saveFirst: 'Save changes first.', closing: 'The app is closing.'
   }
 };
+
+Object.assign(messages.ru, {
+	invert_wasd: 'WASD наоборот', invert_mouse: 'Инверсия мыши',
+	invert_wasdDetail: 'W ↔ S и A ↔ D на физических клавишах. По умолчанию 20 секунд. Действует в активном окне; переключение окна снимает эффект. Игры с RAW Input или античитом могут не поддерживаться.',
+	invert_mouseDetail: 'Обе оси движения мыши наоборот на 20 секунд по умолчанию. Клики и колесо обычные. Переключение окна снимает эффект. RAW Input и античиты могут игнорировать инверсию.',
+	inputWarning: 'Перехват управления', inputFinished: 'Управление восстановлено', inputFocusLost: 'Окно переключено: управление восстановлено, очередь на паузе',
+	inputEmergency: 'Аварийная остановка управления', inputTargetUnavailable: 'Нет подходящего активного окна. Для теста переключись в игру в течение 10 секунд.',
+	inputSendFailed: 'Windows не разрешила замену ввода. Проверь права запуска; совместимость с игрой не гарантируется.',
+	inputUnavailable: 'Перехват управления недоступен. Эффект остановлен.', inputSafetyUnavailable: 'Аварийная горячая клавиша недоступна: перехват управления не запускается.'
+});
+Object.assign(messages.uk, {
+	invert_wasd: 'WASD навпаки', invert_mouse: 'Інверсія миші',
+	invert_wasdDetail: 'W ↔ S та A ↔ D на фізичних клавішах. Типово 20 секунд. Діє в активному вікні; перемикання вікна знімає ефект. Ігри з RAW Input або античитом можуть не підтримуватися.',
+	invert_mouseDetail: 'Обидві осі руху миші навпаки, типово на 20 секунд. Кліки та колесо звичайні. Перемикання вікна знімає ефект. RAW Input та античити можуть ігнорувати інверсію.',
+	inputWarning: 'Перехоплення керування', inputFinished: 'Керування відновлено', inputFocusLost: 'Вікно перемкнено: керування відновлено, черга на паузі',
+	inputEmergency: 'Аварійна зупинка керування', inputTargetUnavailable: 'Немає відповідного активного вікна. Для тесту перемкнися у гру протягом 10 секунд.',
+	inputSendFailed: 'Windows не дозволила заміну введення. Перевір права запуску; сумісність із грою не гарантується.',
+	inputUnavailable: 'Перехоплення керування недоступне. Ефект зупинено.', inputSafetyUnavailable: 'Аварійна гаряча клавіша недоступна: перехоплення не запускається.'
+});
+Object.assign(messages.en, {
+	invert_wasd: 'Reversed WASD', invert_mouse: 'Inverted mouse',
+	invert_wasdDetail: 'Physical W ↔ S and A ↔ D, 20 seconds by default. Applies to the foreground window; switching windows ends the effect. Games with RAW Input or anti-cheat may not support it.',
+	invert_mouseDetail: 'Reverse both mouse movement axes, 20 seconds by default. Buttons and wheel stay normal. Switching windows ends the effect. RAW Input and anti-cheat may ignore the inversion.',
+	inputWarning: 'Input remapping', inputFinished: 'Normal controls restored', inputFocusLost: 'Window changed: controls restored, queue paused',
+	inputEmergency: 'Emergency input stop', inputTargetUnavailable: 'No suitable foreground window. Switch to the game during the 10-second test countdown.',
+	inputSendFailed: 'Windows denied replacement input. Check application privileges; game compatibility is not guaranteed.',
+	inputUnavailable: 'Input remapping unavailable. Effect stopped.', inputSafetyUnavailable: 'Emergency shortcut unavailable: input remapping will not start.'
+});

@@ -5,8 +5,11 @@ const EFFECTS = {
   error_flood: { category: 'normal', weight: 65, duration: 5 },
   vignette: { category: 'normal', weight: 35, duration: 4 },
   text_captcha: { category: 'strong', weight: 50, duration: 45 },
-  arrow_captcha: { category: 'strong', weight: 50, duration: 45 }
+  arrow_captcha: { category: 'strong', weight: 50, duration: 45 },
+  invert_wasd: { category: 'strong', weight: 50, duration: 20 },
+  invert_mouse: { category: 'strong', weight: 50, duration: 20 }
 };
+const INPUT_EFFECTS = ['invert_wasd', 'invert_mouse'];
 
 // Validate values at the persistence and API boundary.
 function integer(value, min, max) {
@@ -68,4 +71,4 @@ function payload(effect, user, settings, now = Date.now()) {
     x: randomInt(22, 79), y: randomInt(20, 79), seed: randomInt(1, 0x7fffffff) };
 }
 
-module.exports = { EFFECTS, normalizeEffect, normalizeSettings, choose, payload };
+module.exports = { EFFECTS, INPUT_EFFECTS, normalizeEffect, normalizeSettings, choose, payload };

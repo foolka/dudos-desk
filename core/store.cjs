@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID, randomBytes } = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
-const { EFFECTS, normalizeEffect, normalizeSettings } = require('./model.cjs');
+const { EFFECTS, INPUT_EFFECTS, normalizeEffect, normalizeSettings } = require('./model.cjs');
 
 // Replace complete files only after their contents have reached disk.
 function atomic(file, data) {
@@ -51,6 +51,14 @@ class Store {
         this.setMeta('overlayKey', randomBytes(32).toString('hex'));
         for (const id of Object.keys(EFFECTS)) this.writeEffect(normalizeEffect(id));
         this.db.exec('PRAGMA user_version=1; COMMIT');
+      }
+      // Add only introduced effects; missing legacy rows remain profile errors.
+      const additions = exists ? INPUT_EFFECTS.filter(id => !this.db.prepare('SELECT id FROM effects WHERE id=?').get(id)) : [];
+      if (additions.length) {
+        this.backup();
+        this.db.exec('BEGIN IMMEDIATE');
+        try { for (const id of additions) this.writeEffect(normalizeEffect(id)); this.db.exec('COMMIT'); }
+        catch (error) { this.db.exec('ROLLBACK'); throw error; }
       }
       this.settings(); this.effects();
       if (!fs.existsSync(marker)) atomic(marker, JSON.stringify({ version: 1, id: this.meta('id') }));

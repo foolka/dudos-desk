@@ -6,7 +6,7 @@ const path = require('node:path');
 const { EFFECTS, normalizeEffect, normalizeSettings, choose, payload } = require('../core/model.cjs');
 
 test('all legacy effect types have bounded editable settings', () => {
-  assert.equal(Object.keys(EFFECTS).length, 5);
+  assert.equal(Object.keys(EFFECTS).length, 7);
   for (const id of Object.keys(EFFECTS)) {
     const e = normalizeEffect(id); assert.ok(e.duration > 0 && e.duration <= 120);
     assert.throws(() => normalizeEffect(id, { duration: 0 }));
@@ -14,6 +14,17 @@ test('all legacy effect types have bounded editable settings', () => {
     assert.throws(() => normalizeEffect(id, { weight: -1 }));
     assert.throws(() => normalizeEffect(id, { volume: '' }));
     assert.throws(() => normalizeEffect(id, { sound: '../../secret.wav' }));
+  }
+});
+
+test('input effects default to twenty seconds in the strong roulette', () => {
+  for (const id of ['invert_wasd', 'invert_mouse']) {
+    const effect = normalizeEffect(id);
+    assert.equal(effect.category, 'strong');
+    assert.equal(effect.duration, 20);
+    assert.equal(normalizeEffect(id, { duration: 37 }).duration, 37);
+    assert.equal(choose([effect], 'strong').id, id);
+    assert.throws(() => choose([effect], 'normal'));
   }
 });
 test('captcha size defaults to the original size and accepts only bounded integers', () => {
