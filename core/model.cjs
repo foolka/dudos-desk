@@ -1,4 +1,5 @@
 const { randomInt, randomUUID } = require('node:crypto');
+const { ID, normalizeMedia } = require('./fullscreen.cjs');
 
 const EFFECTS = {
   bsod: { category: 'normal', weight: 35, duration: 3 },
@@ -18,6 +19,7 @@ function integer(value, min, max) {
 }
 
 function normalizeEffect(id, input = {}) {
+  if (ID.test(id)) return normalizeMedia(id, input);
   const defaults = EFFECTS[id];
   if (!defaults) throw Error('unknownEffect');
   const effect = { ...defaults, enabled: true, volume: 35, sound: '', errorCount: 42, captchaScale: 100, ...input };

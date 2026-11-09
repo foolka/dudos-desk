@@ -46,6 +46,10 @@ async function captchaSize(value) {
     await launch();
     assert.equal((await state()).effects.length, 7);
     assert.equal((await state()).settings.acknowledged, false);
+    assert.equal(await page.locator('[data-action=importRewards]').count(), 0);
+    assert.equal(await page.locator('.b-sidebar__media button').count(), 1);
+    assert.equal(await page.locator('[data-action=addMedia]').isVisible(), true);
+    assert.equal(await page.evaluate(() => typeof window.desk.importRewards), 'undefined');
     assert.equal(await page.locator('[data-field=captchaScale]').count(), 0);
     assert.match(await page.locator('#runtime').textContent(), /Ожидание источника OBS/);
     await action('test'); await page.waitForFunction(() => document.querySelector('#toast').textContent.includes('Сначала'));
@@ -165,7 +169,7 @@ async function captchaSize(value) {
     await page.waitForFunction(() => document.querySelector('#runtime').textContent.startsWith('Готов ·'));
     const overlayKey = before.overlayUrl.split('#')[1];
     const sourceBase = before.overlayUrl.split('/overlay')[0];
-    const sourceState = await source.evaluate(async key => (await fetch('/api/state?version=0.4.0', { headers: { Authorization: 'Bearer ' + key } })).json(), overlayKey);
+    const sourceState = await source.evaluate(async ({ key, version }) => (await fetch('/api/state?version=' + version, { headers: { Authorization: 'Bearer ' + key } })).json(), { key: overlayKey, version: require('../core/server.cjs').OVERLAY_VERSION });
     assert.equal(sourceState.active, null);
     assert.equal(await source.locator('#stage > *').count(), 0);
     await source.goto('about:blank');

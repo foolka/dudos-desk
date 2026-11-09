@@ -15,6 +15,7 @@ const { CaptchaInput } = require('./core/captcha-input.cjs');
 const { ControlsInput } = require('./core/controls-input.cjs');
 const { INPUT_EFFECTS } = require('./core/model.cjs');
 const { createDesktopWindow } = require('./core/desktop-window.cjs');
+const { normalizeMedia, copyMedia } = require('./core/fullscreen.cjs');
 const test = process.argv.includes('--test-mode');
 const startTray = process.argv.includes('--start-tray');
 let startupError;
@@ -51,7 +52,8 @@ function state() {
   return { version: app.getVersion(), effects: store.effects(), settings: store.settings(), runtime: engine.view(),
     overlayUrl: `http://127.0.0.1:${port}/overlay#${store.meta('overlayKey')}`, obsConnected: server.connected(), history: store.history(),
     displays: screen.getAllDisplays().map((d, i) => ({ id: String(d.id), label: d.label || `Display ${i + 1}`, width: d.size.width, height: d.size.height })),
-    hasPassword: fs.existsSync(path.join(profile, 'obs.bin')), auth: auth.view(), twitch: twitch.view(), obsRecovery: recovery.view(), waitForObs: store.meta('waitForObs') !== false, profile, shortcut, test };
+    hasPassword: fs.existsSync(path.join(profile, 'obs.bin')), auth: auth.view(), twitch: twitch.view(), obsRecovery: recovery.view(), waitForObs: store.meta('waitForObs') !== false, profile, shortcut, test,
+    mediaUrls: Object.fromEntries(store.effects().filter(e => e.kind === 'fullscreen').map(e => [e.id, { mediaUrl: server.mediaUrl(e.file), soundUrl: e.sound ? server.mediaUrl(e.sound) : '' }])) };
 }
 function secureWindow(window, url) {
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -140,9 +142,26 @@ app.whenReady().then(async () => {
   engine.on('change', value => {
     const id = value.active?.eventId || null;
     if (id !== lastEvent) { lastEvent = id; void syncDesktop(); }
+    else if (effectWindow && !effectWindow.isDestroyed()) effectWindow.webContents.send('effect:state', server.present(value.active));
   });
   const actions = {
     state,
+    addMedia: async () => {
+      const picked = await dialog.showOpenDialog(win, { properties: ['openFile', 'multiSelections'], filters: [{ name: 'Video / Image', extensions: ['mp4', 'webm', 'png', 'jpg', 'jpeg', 'webp', 'gif'] }] });
+      if (picked.canceled) return [];
+      if (picked.filePaths.length > 100 || store.effects().length + picked.filePaths.length > 507) throw Error('tooManyMedia');
+      const added = [];
+      for (const source of picked.filePaths) {
+        const effect = normalizeMedia('media-' + randomUUID(), { title: path.basename(source).slice(0, 120), file: copyMedia(profile, source) });
+        store.saveEffect(effect.id, effect); added.push(effect);
+      }
+      return added;
+    },
+    removeMedia: async id => {
+      if (!store.effects().some(e => e.id === id && e.kind === 'fullscreen')) throw Error('unknownEffect');
+      const result = await dialog.showMessageBox(win, { type: 'question', message: 'Удалить элемент Dudos Lite? / Delete this Dudos Lite item?', buttons: ['Отмена / Cancel', 'Удалить / Delete'], defaultId: 0, cancelId: 0 });
+      if (result.response === 1) store.removeMedia(id);
+    },
     saveEffect: ({ id, effect }) => store.saveEffect(id, effect),
     settings: input => { const result = store.saveSettings(input); theme(); return result; },
     pause: value => engine.pause(value === true),
@@ -206,7 +225,9 @@ app.whenReady().then(async () => {
     catch (error) { return { ok: false, error: name === 'obsSetup' ? (/закройте OBS|OBS или его настройки/.test(error.message) ? 'obsCloseFirst' : 'obsSetupFailed') : error.code === 'EACCES' ? 'fileAccess' : error.message }; }
   });
   const effectActions = {
-    state: () => engine.active,
+    state: () => server.present(engine.active),
+    mediaReady: value => server.present(engine.mediaReady(value?.eventId, value?.seconds)),
+    mediaFailed: id => { if (engine.active?.kind === 'fullscreen') return engine.finish(id, 'renderFailed'); },
     ready: id => {
       if (test || engine.active?.eventId !== id || !engine.active.id.endsWith('captcha') || effectWindow.captchaReady) return;
       effectWindow.captchaReady = true;

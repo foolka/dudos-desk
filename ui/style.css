@@ -443,6 +443,27 @@ svg {
   overflow-wrap: anywhere;
 }
 
+.b-media-editor {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr);
+  gap: 24px;
+}
+@media screen and (max-width: 1050px) {
+  .b-media-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.b-media-editor__motion {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+@media screen and (max-width: 650px) {
+  .b-media-editor__motion {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .b-nav {
   display: flex;
   flex-wrap: wrap;
@@ -639,6 +660,16 @@ svg {
   border-top: 1px solid var(--line);
   font-size: 11px;
   color: var(--muted);
+}
+.b-sidebar__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.b-sidebar__media {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
 .b-taskbar {

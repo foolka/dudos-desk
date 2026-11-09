@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.1 - 2026-11-09
+
+- Removed the Reward Desk import button, its tooltip and the desktop import action. Previously imported media, settings and Twitch bindings are preserved.
+- Custom scares are still added directly to Dudos Lite. OBS recovery and Windows taskbar pinning remain available.
+- Fixed concurrent status polling discarding a just-saved language, theme or connection setting in the editor.
+- Public release includes the fullscreen video/image roulette introduced in 0.5.0. Existing profiles and Twitch bindings are preserved.
+
+## 0.5.0 - 2026-11-09 (local build)
+
+- Custom fullscreen video/image scares in the existing Dudos Lite roulette, displayed on the selected monitor and in OBS. No additional Twitch reward is created.
+- Per-item weights, volume, image duration, replacement audio, independent entry/exit animations, duration and direction. Silent editor preview and delayed desktop test.
+- Read-only import from local Reward Desk and Reward Desk OBS profiles with independent media copies, backup, atomic commit and duplicate protection. Source records and Twitch credentials are not changed.
+- Shared media timeline, late-source seeking, transparent surround and bounded loading/playback. Stop disposes media, audio and animation together.
+- RU/UK/EN and light/dark editor; new unit and isolated browser tests. Local installers only; no release publication.
+
 ## 0.4.1
 
 - Первый публичный выпуск: открытый репозиторий, установщик EXE и portable ZIP с контрольными суммами.

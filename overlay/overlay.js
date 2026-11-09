@@ -1,5 +1,5 @@
 (() => {
-  const VERSION = '0.4.0';
+  const VERSION = '0.5.0';
   const stage = document.getElementById('stage');
   const desktop = !!window.dudosEffect;
   const preview = new URLSearchParams(location.search).has('preview');
@@ -16,6 +16,7 @@
     en: ['Your stream ran into a problem. It needs a little dramatic moment.', 'Collecting a little chaos. Your game will be released shortly.', 'Streamer verification', 'Enter the code and press Enter', 'Suspicious keyboard', 'Press the arrows in this order', 'Incorrect code', 'Game process temporarily not found. Please try to survive this.']
   };
   let current = null, timers = [], audio = null, audioUrl = null, audioContext = null, lastSuccess = Date.now(), progress = 0, generation = 0;
+  let fullscreen = null;
 
   // Keep the OBS canvas and in-app preview geometrically identical.
   function resize() { stage.style.transform = `scale(${innerWidth / 1920}, ${innerHeight / 1080})`; }
@@ -26,6 +27,7 @@
     return el;
   }
   function clear() {
+    fullscreen?.stop(); fullscreen = null;
     generation++;
     timers.forEach(clearTimeout); timers = [];
     if (audio) { audio.pause(); audio.src = ''; audio = null; }
@@ -69,6 +71,7 @@
   function render(active) {
     if (!active) { if (current) clear(); return; }
     if (active.eventId === current?.eventId) {
+      if (fullscreen) { current = active; fullscreen.update(active); return; }
       if (!desktop) { current = active; paintCaptcha(); }
       return;
     }
@@ -77,6 +80,11 @@
     progress = current.captcha.progress;
     const t = copy[active.language] || copy.en;
     document.documentElement.lang = active.language || 'en';
+    if (active.kind === 'fullscreen') {
+      fullscreen = DudosFullscreen.mount(document.body, active, { desktop, preview,
+        ready: value => window.dudosEffect.mediaReady(value), failed: id => { if (desktop) void window.dudosEffect.mediaFailed(id); } });
+      return;
+    }
     void sound(active);
     if (active.id === 'bsod') {
       const el = node('div', 'bsod');

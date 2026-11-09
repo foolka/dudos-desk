@@ -83,6 +83,7 @@ class Engine extends EventEmitter {
     if (this.active || !this.queue.length || this.store.settings().paused || this.closed) return;
     if (this.queue[0].requiresObs && !this.ready()) return;
     this.active = { ...this.queue.shift(), startedAt: this.now() };
+    if (this.active.kind === 'fullscreen') this.active.duration = 20;
     this.active.endsAt = this.active.startedAt + this.active.duration * 1000;
     if (['text_captcha', 'arrow_captcha'].includes(this.active.id)) {
       this.active.captcha = { text: '', progress: 0, error: false, solved: false };
@@ -91,6 +92,21 @@ class Engine extends EventEmitter {
     this.timer = this.setTimer(() => this.finish(id, 'timeout'), this.active.duration * 1000);
     this.store.log('started', { effect: this.active.id, user: this.active.user });
     this.changed();
+  }
+  // Only the trusted desktop renderer starts a shared, bounded media timeline.
+  mediaReady(id, seconds) {
+    const active = this.active;
+    if (!active || active.eventId !== id || active.kind !== 'fullscreen' || active.mediaStartedAt) return null;
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 600) return null;
+    const p = active.presentation;
+    const duration = active.mediaKind === 'image' ? p.imageSeconds : seconds;
+    active.mediaStartedAt = this.now();
+    active.duration = duration + (active.mediaKind === 'image' && p.enter !== 'none' ? p.enterMs / 1000 : 0) + (p.exit !== 'none' ? p.exitMs / 1000 : 0);
+    active.endsAt = active.mediaStartedAt + active.duration * 1000;
+    this.clearTimer(this.timer);
+    this.timer = this.setTimer(() => this.finish(id, 'finished'), active.duration * 1000 + 200);
+    this.changed();
+    return { ...active };
   }
   // Only the trusted desktop window supplies bounded, transient captcha input.
   updateCaptcha(input) {

@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('dudosEffect', {
   state: () => ipcRenderer.invoke('effect:state'),
   ready: id => ipcRenderer.invoke('effect:ready', id),
+  mediaReady: value => ipcRenderer.invoke('effect:mediaReady', value),
+  mediaFailed: id => ipcRenderer.invoke('effect:mediaFailed', id),
   onFocus: handler => ipcRenderer.on('effect:focus', () => handler()),
   progress: value => ipcRenderer.invoke('effect:progress', value),
   complete: id => ipcRenderer.invoke('effect:complete', id),

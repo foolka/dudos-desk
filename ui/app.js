@@ -1,4 +1,5 @@
 let state, selected = 'bsod', view = 'effects', draft = null, dirty = false, previewReady = false, toastTimer;
+let settingsRevision = 0;
 const rewardDrafts = {}, rewardDirty = new Set();
 const icons = { bsod: 'monitor-x', error_flood: 'panels-top-left', vignette: 'scan-eye', text_captcha: 'text-cursor-input', arrow_captcha: 'move', invert_wasd: 'keyboard', invert_mouse: 'mouse-pointer-2' };
 const $ = selector => document.querySelector(selector);
@@ -20,8 +21,15 @@ async function call(name, input) {
   if (!response.ok) { toast(messages[state?.settings.language || 'ru'][response.error] || t('operationFailed')); throw Error(response.error); }
   return response.value;
 }
+// Apply saved settings to the current state, not an object replaced during await.
+async function saveSettings(input) {
+	settingsRevision++;
+	const settings = await call('settings', input);
+	state.settings = settings;
+	settingsRevision++;
+}
 function paintIcons() { lucide.createIcons({ attrs: { 'stroke-width': 1.7 } }); }
-function effectDraft() { if (!draft) draft = { ...state.effects.find(e => e.id === selected) }; return draft; }
+function effectDraft() { if (!draft) draft = structuredClone(state.effects.find(e => e.id === selected)); return draft; }
 function options(values, current) { return values.map(value => `<option value="${value}"${value === current ? ' selected' : ''}>${esc(t(value))}</option>`).join(''); }
 
 // Header and navigation stay outside both independently scrolling columns.
@@ -47,11 +55,37 @@ function render() {
   else renderHistory();
   paintIcons(); updateStatus();
 }
+// Keep custom media and built-in roulette items in the same sidebar.
 function sidebar() {
-  return `<aside class="b-sidebar">${['normal', 'strong'].map(category => `<div class="b-sidebar__group"><h2>${esc(t(category))}</h2>${state.effects.filter(e => e.category === category).map(e => `<button type="button" data-effect="${e.id}" class="b-sidebar__effect${e.id === selected ? ' is-active' : ''}" aria-pressed="${e.id === selected}">${icon(icons[e.id])}<span>${esc(t(e.id))}<small>${e.enabled && e.weight > 0 ? `${e.weight} · ${esc(t('weight'))}` : esc(t('off'))}</small></span><span class="b-sidebar__dot${e.enabled ? ' is-on' : ''}"></span></button>`).join('')}</div>`).join('')}<div class="b-sidebar__note">${esc(t('copyright'))}</div></aside>`;
+	return `
+		<aside class="b-sidebar">
+			<div class="b-sidebar__media">${button('addMedia', 'addMedia', 'plus')}</div>
+			${['normal', 'strong'].map(category => `
+				<div class="b-sidebar__group">
+					<h2>${category === 'normal' ? 'Dudos Lite' : esc(t(category))}</h2>
+					${state.effects.filter(e => e.category === category).map(e => `
+						<button
+							type="button"
+							data-effect="${e.id}"
+							class="b-sidebar__effect${e.id === selected ? ' is-active' : ''}"
+							aria-pressed="${e.id === selected}"
+						>
+							${icon(icons[e.id] || (e.mediaKind === 'image' ? 'image' : 'film'))}
+							<span class="b-sidebar__name">
+								${esc(e.title || t(e.id))}
+								<small>${e.enabled && e.weight > 0 ? `${e.weight} · ${esc(t('weight'))}` : esc(t('off'))}</small>
+							</span>
+							<span class="b-sidebar__dot${e.enabled ? ' is-on' : ''}"></span>
+						</button>
+					`).join('')}
+				</div>
+			`).join('')}
+			<div class="b-sidebar__note">${esc(t('copyright'))}</div>
+		</aside>`;
 }
 function renderEffect() {
   const e = effectDraft();
+  if (e.kind === 'fullscreen') { renderFullscreen(e); return; }
   $('#main').innerHTML = `<div class="b-editor__heading"><div><h1>${esc(t(selected))}</h1><div class="b-muted">${esc(t(selected + 'Detail'))}</div></div><label class="b-check"><input type="checkbox" data-field="enabled"${e.enabled ? ' checked' : ''}>${esc(t('enabled'))}${help('enabledHelp')}</label></div>
     <form id="effect-form" class="b-editor"><div class="b-editor__settings b-form">
       <div class="b-form__row"><label class="b-field"><span>${esc(t('category'))}</span><select data-field="category">${options(['normal', 'strong'], e.category)}</select></label>
@@ -138,17 +172,34 @@ function updateChance() {
 }
 function preview() {
   if (!previewReady || !draft) return;
+  if (draft.kind === 'fullscreen') {
+    if ($('#effect-form') && !$('#effect-form').checkValidity()) return;
+    $('#preview')?.contentWindow.postMessage({ type: 'preview', active: { ...structuredClone(draft), ...fullscreenPreviewUrls(draft), eventId: crypto.randomUUID(), audioTarget: 'off' } }, '*');
+    return;
+  }
   $('#preview')?.contentWindow.postMessage({ type: 'preview', active: { ...draft, eventId: crypto.randomUUID(), language: state.settings.language, audioTarget: 'off', seed: 512, x: 58, y: 48, code: 'A7DK3H', arrows: ['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft'] } }, '*');
 }
 addEventListener('message', event => { if (event.source === $('#preview')?.contentWindow && event.data?.type === 'previewReady') { previewReady = true; preview(); } });
 
 // Poll status without replacing form fields while the user types.
 async function refresh() {
-  try { state = await call('state'); updateStatus(); if (view === 'history') updateHistory(); }
+  try {
+    const revision = settingsRevision;
+    const value = await call('state');
+    if (revision !== settingsRevision) value.settings = state.settings;
+    state = value; updateStatus(); if (view === 'history') updateHistory();
+  }
   catch {}
   setTimeout(refresh, 750);
 }
 document.addEventListener('input', event => {
+  if (event.target.dataset.presentation && draft?.kind === 'fullscreen') {
+    const el = event.target;
+    draft.presentation[el.dataset.presentation] = ['number', 'range'].includes(el.type) ? (el.value === '' ? '' : Number(el.value)) : el.value;
+    dirty = true; $('#save-status').textContent = t('unsaved');
+    if ($('#sound-volume-value')) $('#sound-volume-value').textContent = draft.presentation.soundVolume + '%';
+    return;
+  }
   if (event.target.dataset.rewardField) {
     const category = event.target.closest('[data-reward-form]').dataset.rewardForm;
     const r = rewardDrafts[category] ||= { ...state.twitch.rewards.find(r => r.category === category) };
@@ -166,10 +217,10 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('change', async event => {
   try {
-    if (event.target.id === 'language') { state.settings = await call('settings', { language: event.target.value }); render(); }
-    else if (event.target.id === 'acknowledge') { state.settings = await call('settings', { acknowledged: event.target.checked }); render(); }
-    else if (event.target.id === 'display-id') state.settings = await call('settings', { displayId: event.target.value });
-    else if (event.target.id === 'audio-target') state.settings = await call('settings', { audioTarget: event.target.value });
+    if (event.target.id === 'language') { await saveSettings({ language: event.target.value }); render(); }
+    else if (event.target.id === 'acknowledge') { await saveSettings({ acknowledged: event.target.checked }); render(); }
+    else if (event.target.id === 'display-id') await saveSettings({ displayId: event.target.value });
+    else if (event.target.id === 'audio-target') await saveSettings({ audioTarget: event.target.value });
     else if (event.target.id === 'obs-auto') { await call('obsAuto', event.target.checked); state = await call('state'); updateStatus(); }
     else if (event.target.id === 'wait-for-obs') { await call('waitForObs', event.target.checked); state = await call('state'); }
   } catch {}
@@ -186,7 +237,7 @@ document.addEventListener('submit', async event => {
       state = await call('state'); dirty = false; render(); toast(t('saved'));
     } else if (event.target.id === 'guard-form') {
       const lines = id => $(id).value.split('\n').map(s => s.trim()).filter(Boolean);
-      state.settings = await call('settings', { guard: $('#guard-enabled').checked, pcSources: lines('#pc-sources'), blockedSources: lines('#blocked-sources'), obsPort: Number($('#obs-port').value) });
+      await saveSettings({ guard: $('#guard-enabled').checked, pcSources: lines('#pc-sources'), blockedSources: lines('#blocked-sources'), obsPort: Number($('#obs-port').value) });
       toast(t('saved'));
     }
   } catch {}
@@ -201,7 +252,18 @@ document.addEventListener('click', async event => {
       render(); return;
     }
     const action = target.dataset.action;
-    if (action === 'theme') { state.settings = await call('settings', { theme: state.settings.theme === 'dark' ? 'light' : 'dark' }); render(); }
+    if (['addMedia', 'removeMedia'].includes(action)) {
+      if (dirty || rewardDirty.size) return toast(t('saveFirst'));
+      target.disabled = true;
+      try {
+        const result = await call(action, selected);
+        state = await call('state');
+        if (action === 'addMedia' && result?.length) selected = result[0].id;
+        if (!state.effects.some(e => e.id === selected)) selected = 'bsod';
+        draft = null; render();
+      } finally { target.disabled = false; }
+    }
+    else if (action === 'theme') { await saveSettings({ theme: state.settings.theme === 'dark' ? 'light' : 'dark' }); render(); }
     else if (action === 'pause') { await call('pause', !state.runtime.paused); state = await call('state'); render(); }
     else if (action === 'stop') { await call('stop'); state = await call('state'); updateStatus(); }
     else if (action === 'replay') preview();

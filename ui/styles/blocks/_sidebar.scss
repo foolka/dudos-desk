@@ -66,4 +66,15 @@
         font-size: 11px;
         color: var(--muted);
     }
+	&__name {
+		min-width: 0;
+		overflow-wrap: anywhere;
+	}
+
+	&__media {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin-bottom: 20px;
+	}
 }

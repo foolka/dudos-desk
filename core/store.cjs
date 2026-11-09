@@ -3,6 +3,7 @@ const path = require('node:path');
 const { randomUUID, randomBytes } = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const { EFFECTS, INPUT_EFFECTS, normalizeEffect, normalizeSettings } = require('./model.cjs');
+const { ID } = require('./fullscreen.cjs');
 
 // Replace complete files only after their contents have reached disk.
 function atomic(file, data) {
@@ -68,9 +69,19 @@ class Store {
   meta(key) { const r = this.db.prepare('SELECT value FROM meta WHERE key=?').get(key); return r ? JSON.parse(r.value) : null; }
   setMeta(key, value) { this.db.prepare('INSERT INTO meta VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, JSON.stringify(value)); }
   settings() { return normalizeSettings(this.meta('settings')); }
-  effects() { return Object.keys(EFFECTS).map(id => normalizeEffect(id, JSON.parse(this.db.prepare('SELECT data FROM effects WHERE id=?').get(id).data))); }
+  effects() {
+    const rows = this.db.prepare('SELECT id,data FROM effects ORDER BY rowid').all();
+    if (Object.keys(EFFECTS).some(id => !rows.some(row => row.id === id))) throw Error('profileDamaged');
+    return rows.map(row => normalizeEffect(row.id, JSON.parse(row.data)));
+  }
   writeEffect(effect) { this.db.prepare('INSERT INTO effects VALUES(?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data').run(effect.id, JSON.stringify(effect)); }
   saveEffect(id, input) { const effect = normalizeEffect(id, input); this.backup(); this.writeEffect(effect); return effect; }
+  removeMedia(id) {
+    if (!ID.test(id)) throw Error('unknownEffect');
+    this.backup();
+    this.db.prepare('DELETE FROM effects WHERE id=?').run(id);
+    // Files stay available to queued events and database backups.
+  }
   saveSettings(input) { const value = normalizeSettings({ ...this.settings(), ...input }); this.backup(); this.setMeta('settings', value); return value; }
   backup() {
     const folder = path.join(this.root, 'backups');

@@ -8,4 +8,5 @@ test-output/
 profile/
 native/*.exe
 /core/taskbar-native.node
-/test-results/taskbar/
+/test-results/
+/AGENTS.md

@@ -1,7 +1,7 @@
 {
   "name": "dudos-desk",
   "productName": "Dudos Desk",
-  "version": "0.4.1",
+  "version": "0.5.1",
   "private": true,
   "description": "Local playful desktop effects and OBS mirror for streamers",
   "author": "FermionaPlay",
@@ -17,6 +17,7 @@
     "test": "node --test tests/*.test.cjs",
     "test:ui": "node tools/test-ui.cjs",
     "test:overlay": "node tools/test-overlay.cjs",
+    "test:fullscreen": "node tools/test-fullscreen.cjs",
     "test:desktop": "node tools/test-desktop.cjs",
     "assets": "node tools/create-assets.cjs",
     "styles": "sass ui/styles/main.scss ui/style.css --no-source-map",
